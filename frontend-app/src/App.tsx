@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ResearcherSetup } from "./screens/ResearcherSetup";
 import { Welcome } from "./screens/Welcome";
-import { Listening } from "./screens/Listening";
+import { ModeSelect } from "./screens/ModeSelect";
+import { VoiceTextChat } from "./screens/VoiceTextChat";
+import { AvatarChat } from "./screens/AvatarChat";
 import { CoreInfo } from "./screens/CoreInfo";
-import { QandA } from "./screens/QandA";
 import { Closing } from "./screens/Closing";
 import { useSession } from "./hooks/useSession";
-import { useTTS, stopAllSpeech } from "./hooks/useTTS";
-import { api, type InputMethod, type SessionStartResponse } from "./lib/api";
-import type { QATurn } from "./types";
+import { stopAllSpeech } from "./hooks/useTTS";
+import type { SessionStartResponse } from "./lib/api";
 
 /** Stops any in-flight TTS and resets scroll on every route change - without this, audio started
  * on one screen kept playing after navigating away (confirmed bug). */
@@ -51,12 +51,7 @@ export default function AppRoot() {
 function App() {
   const navigate = useNavigate();
   const { session, error: sessionError, startSession, endSession } = useSession();
-  const answerTts = useTTS();
-
   const [starting, setStarting] = useState(false);
-  const [qaHistory, setQaHistory] = useState<QATurn[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [listeningReturnTo, setListeningReturnTo] = useState<"/welcome" | "/qa">("/welcome");
   const [ended, setEnded] = useState(false);
 
   useBackNavigationTrap(ended);
@@ -68,41 +63,11 @@ function App() {
     if (started) navigate("/welcome");
   }
 
-  async function submitQuery(text: string, method: InputMethod) {
-    if (!session || ended) return;
-    setSubmitting(true);
-    navigate("/qa");
-    try {
-      const res = await api.query(session.session_id, text, method);
-      setQaHistory((h) => [
-        ...h,
-        { turnNumber: res.turn_number, queryText: text, answerText: res.answer_text, inScope: res.in_scope },
-      ]);
-      answerTts.speak(res.answer_text);
-    } catch {
-      setQaHistory((h) => [
-        ...h,
-        {
-          turnNumber: h.length + 1,
-          queryText: text,
-          answerText: "Sorry, something went wrong reaching the system. Please try again.",
-          inScope: false,
-        },
-      ]);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function openListening(returnTo: "/welcome" | "/qa") {
-    setListeningReturnTo(returnTo);
-    navigate("/listening");
-  }
-
   async function handleEndSession() {
     if (ended) return; // kiosk dead-end guard: never re-enter the session once closed
     setEnded(true);
     await endSession();
+    navigate("/closing");
   }
 
   return (
@@ -113,19 +78,7 @@ function App() {
         path="/welcome"
         element={
           <RequireSession session={session}>
-            <Welcome onTellMe={() => navigate("/core-info")} onAskQuestion={() => openListening("/welcome")} />
-          </RequireSession>
-        }
-      />
-
-      <Route
-        path="/listening"
-        element={
-          <RequireSession session={session}>
-            <Listening
-              onSubmit={(text, method) => submitQuery(text, method)}
-              onCancel={() => navigate(listeningReturnTo)}
-            />
+            <Welcome onTellMe={() => navigate("/core-info")} onAskQuestion={() => navigate("/mode-select")} />
           </RequireSession>
         }
       />
@@ -138,7 +91,7 @@ function App() {
               <CoreInfo
                 sessionId={session.session_id}
                 productDisplayName={session.product_display_name}
-                onAskQuestion={() => navigate("/qa")}
+                onAskQuestion={() => navigate("/mode-select")}
               />
             )}
           </RequireSession>
@@ -146,16 +99,28 @@ function App() {
       />
 
       <Route
-        path="/qa"
+        path="/mode-select"
         element={
           <RequireSession session={session}>
-            <QandA
-              history={qaHistory}
-              submitting={submitting}
-              onSubmitTyped={(text) => submitQuery(text, "typed")}
-              onOpenListening={() => openListening("/qa")}
-              onEndSession={() => navigate("/closing")}
-            />
+            <ModeSelect onChooseChat={() => navigate("/chat")} onChooseAvatar={() => navigate("/avatar")} />
+          </RequireSession>
+        }
+      />
+
+      <Route
+        path="/chat"
+        element={
+          <RequireSession session={session}>
+            {session && <VoiceTextChat session={session} onEndSession={handleEndSession} />}
+          </RequireSession>
+        }
+      />
+
+      <Route
+        path="/avatar"
+        element={
+          <RequireSession session={session}>
+            {session && <AvatarChat session={session} onEndSession={handleEndSession} />}
           </RequireSession>
         }
       />
@@ -164,7 +129,7 @@ function App() {
         path="/closing"
         element={
           <RequireSession session={session}>
-            <Closing onSessionEnd={handleEndSession} />
+            <Closing onSessionEnd={() => {}} />
           </RequireSession>
         }
       />

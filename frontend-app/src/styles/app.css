@@ -475,3 +475,413 @@
     max-width: 640px;
   }
 }
+
+/* ---------- Mode select ---------- */
+
+.mode-select-content {
+  max-width: 640px;
+  text-align: center;
+}
+
+.mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  min-height: 160px;
+  width: 100%;
+}
+
+.mode-card:hover {
+  border-color: var(--color-primary);
+}
+
+.mode-card-icon {
+  font-size: 2.5rem;
+}
+
+.mode-card-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.mode-card-desc {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+@media (min-width: 640px) {
+  .mode-cards {
+    flex-direction: row;
+  }
+}
+
+/* ---------- Voice + text chat ---------- */
+
+.chat-screen {
+  align-items: stretch;
+  padding: var(--space-2);
+}
+
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+
+.chat-live-transcript {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+.chat-live-transcript .waveform {
+  height: 32px;
+}
+
+.chat-live-transcript .waveform-bar {
+  background: var(--color-primary);
+  width: 5px;
+}
+
+.chat-input-bar {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.chat-input-bar input {
+  flex: 1;
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  font-size: 1.05rem;
+}
+
+.chat-input-bar .btn {
+  width: auto;
+  min-width: 90px;
+}
+
+.mic-recording {
+  background: var(--color-warning) !important;
+  border-color: var(--color-warning) !important;
+  color: white !important;
+}
+
+/* ---------- Avatar mode: live conversation layout (avatar centerpiece + chat-style side
+   transcript), modeled on voice-assistant apps rather than a "tap to talk" button flow. ---------- */
+
+.avatar-screen {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background: radial-gradient(ellipse at 50% 0%, #e4ede9 0%, var(--color-bg) 55%);
+}
+
+.avatar-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100dvh;
+}
+
+.avatar-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+}
+
+.avatar {
+  position: relative;
+  width: 240px;
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-svg {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.avatar-ground-shadow {
+  fill: #1a2422;
+  opacity: 0.1;
+}
+
+.avatar-body-highlight {
+  fill: none;
+  stroke: white;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+.avatar-head-highlight {
+  fill: white;
+  opacity: 0.45;
+}
+
+.avatar-visor-highlight {
+  fill: none;
+  stroke: #5a6a72;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.avatar-eye-spark {
+  fill: white;
+  opacity: 0.9;
+}
+
+.avatar-chest-bar {
+  fill: var(--color-accent);
+  opacity: 0.35;
+  transform-origin: bottom;
+}
+
+.avatar-pulse-ring {
+  position: absolute;
+  inset: 4px 12px 44px 12px;
+  border-radius: 50%;
+  border: 3px solid var(--color-accent);
+  opacity: 0;
+}
+
+.avatar-idle .avatar-svg {
+  animation: avatar-breathe 4s ease-in-out infinite;
+}
+
+.avatar-listening .avatar-pulse-ring {
+  opacity: 1;
+  animation: avatar-pulse 1.3s ease-out infinite;
+}
+
+.avatar-listening .avatar-eye {
+  animation: avatar-eye-glow 1.3s ease-in-out infinite;
+}
+
+.avatar-thinking .avatar-svg {
+  animation: avatar-tilt 1.6s ease-in-out infinite;
+}
+
+.avatar-thinking .avatar-chest-bar {
+  animation: avatar-chest-cycle 1.4s ease-in-out infinite;
+}
+.avatar-thinking .avatar-chest-bar-2 { animation-delay: 0.15s; }
+.avatar-thinking .avatar-chest-bar-3 { animation-delay: 0.3s; }
+
+.avatar-speaking .avatar-chest-bar {
+  animation: avatar-chest-talk 0.5s ease-in-out infinite;
+}
+.avatar-speaking .avatar-chest-bar-2 { animation-delay: 0.12s; }
+.avatar-speaking .avatar-chest-bar-3 { animation-delay: 0.24s; }
+
+.avatar-speaking .avatar-eye {
+  animation: avatar-eye-glow 0.6s ease-in-out infinite;
+}
+
+@keyframes avatar-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.01); }
+}
+
+@keyframes avatar-pulse {
+  0% { transform: scale(0.92); opacity: 0.7; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+@keyframes avatar-eye-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes avatar-tilt {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes avatar-chest-cycle {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@keyframes avatar-chest-talk {
+  0%, 100% { transform: scaleY(0.6); opacity: 0.5; }
+  50% { transform: scaleY(1.4); opacity: 1; }
+}
+
+.avatar-status {
+  font-size: 1.05rem;
+  min-height: 1.6em;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* Floating "dock" - a single glass-style control bar rather than a big standalone button. */
+.avatar-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 0.5rem;
+  box-shadow: 0 8px 24px rgba(20, 32, 30, 0.12);
+}
+
+.mic-button-compact {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: unset;
+}
+
+.mic-button-compact.mic-recording {
+  background: var(--color-warning) !important;
+}
+
+.avatar-dock .link-button {
+  min-height: unset;
+  font-size: 0.9rem;
+  padding: 0 var(--space-2) 0 0;
+}
+
+.avatar-dock input {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  min-width: 180px;
+  outline: none;
+}
+
+.avatar-dock .btn {
+  width: auto;
+  min-width: unset;
+  min-height: 44px;
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+}
+
+.avatar-end-session {
+  width: auto;
+  min-width: unset;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  min-height: 36px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-muted);
+}
+
+/* Chat-style side transcript, matching the bubble language used elsewhere in the app rather
+   than plain paragraphs. */
+.avatar-transcript-panel {
+  border-top: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.avatar-transcript-empty {
+  text-align: center;
+  margin: auto;
+}
+
+.avatar-transcript-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.avatar-transcript-bubble {
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  max-width: 90%;
+}
+
+.avatar-transcript-question {
+  align-self: flex-end;
+  background: var(--color-primary);
+  color: white;
+  border-bottom-right-radius: 3px;
+}
+
+.avatar-transcript-answer {
+  align-self: flex-start;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: 3px;
+}
+
+.avatar-transcript-deflected .avatar-transcript-answer {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+@media (min-width: 900px) {
+  .avatar-layout {
+    flex-direction: row;
+  }
+
+  .avatar-transcript-panel {
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+    max-height: none;
+    width: 340px;
+    flex-shrink: 0;
+  }
+}
