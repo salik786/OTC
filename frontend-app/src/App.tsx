@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ResearcherSetup } from "./screens/ResearcherSetup";
 import { Welcome } from "./screens/Welcome";
 import { Listening } from "./screens/Listening";
@@ -6,38 +7,71 @@ import { CoreInfo } from "./screens/CoreInfo";
 import { QandA } from "./screens/QandA";
 import { Closing } from "./screens/Closing";
 import { useSession } from "./hooks/useSession";
-import { useTTS } from "./hooks/useTTS";
-import { api, type InputMethod } from "./lib/api";
-import type { QATurn, Screen } from "./types";
+import { useTTS, stopAllSpeech } from "./hooks/useTTS";
+import { api, type InputMethod, type SessionStartResponse } from "./lib/api";
+import type { QATurn } from "./types";
 
-export default function App() {
+/** Stops any in-flight TTS and resets scroll on every route change - without this, audio started
+ * on one screen kept playing after navigating away (confirmed bug). */
+function NavigationEffects() {
+  const location = useLocation();
+  useEffect(() => {
+    stopAllSpeech();
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+  return null;
+}
+
+/** Traps the browser back button on the Closing screen - kiosk sessions must be a dead end,
+ * not re-enterable once closed. */
+function useBackNavigationTrap(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    window.history.pushState(null, "", window.location.href);
+    const handler = () => window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [active]);
+}
+
+function RequireSession({ session, children }: { session: SessionStartResponse | null; children: React.ReactNode }) {
+  if (!session) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+export default function AppRoot() {
+  return (
+    <BrowserRouter>
+      <NavigationEffects />
+      <App />
+    </BrowserRouter>
+  );
+}
+
+function App() {
+  const navigate = useNavigate();
   const { session, error: sessionError, startSession, endSession } = useSession();
   const answerTts = useTTS();
 
-  const [screen, setScreen] = useState<Screen>("setup");
   const [starting, setStarting] = useState(false);
   const [qaHistory, setQaHistory] = useState<QATurn[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [listeningReturnTo, setListeningReturnTo] = useState<"welcome" | "qa">("welcome");
+  const [listeningReturnTo, setListeningReturnTo] = useState<"/welcome" | "/qa">("/welcome");
   const [ended, setEnded] = useState(false);
 
-  // Each screen is a fresh full-height view - without this, scroll position from a taller
-  // previous screen (e.g. Core Info) leaks into the next one, hiding its top content.
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [screen]);
+  useBackNavigationTrap(ended);
 
   async function handleStart(productSlug: string) {
     setStarting(true);
     const started = await startSession(productSlug);
     setStarting(false);
-    if (started) setScreen("welcome");
+    if (started) navigate("/welcome");
   }
 
   async function submitQuery(text: string, method: InputMethod) {
     if (!session || ended) return;
     setSubmitting(true);
-    setScreen("qa");
+    navigate("/qa");
     try {
       const res = await api.query(session.session_id, text, method);
       setQaHistory((h) => [
@@ -60,9 +94,9 @@ export default function App() {
     }
   }
 
-  function openListening(returnTo: "welcome" | "qa") {
+  function openListening(returnTo: "/welcome" | "/qa") {
     setListeningReturnTo(returnTo);
-    setScreen("listening");
+    navigate("/listening");
   }
 
   async function handleEndSession() {
@@ -72,39 +106,70 @@ export default function App() {
   }
 
   return (
-    <>
-      {screen === "setup" && <ResearcherSetup onStart={handleStart} starting={starting} error={sessionError} />}
+    <Routes>
+      <Route path="/" element={<ResearcherSetup onStart={handleStart} starting={starting} error={sessionError} />} />
 
-      {screen === "welcome" && session && (
-        <Welcome onTellMe={() => setScreen("core-info")} onAskQuestion={() => openListening("welcome")} />
-      )}
+      <Route
+        path="/welcome"
+        element={
+          <RequireSession session={session}>
+            <Welcome onTellMe={() => navigate("/core-info")} onAskQuestion={() => openListening("/welcome")} />
+          </RequireSession>
+        }
+      />
 
-      {screen === "listening" && (
-        <Listening
-          onSubmit={(text, method) => submitQuery(text, method)}
-          onCancel={() => setScreen(listeningReturnTo)}
-        />
-      )}
+      <Route
+        path="/listening"
+        element={
+          <RequireSession session={session}>
+            <Listening
+              onSubmit={(text, method) => submitQuery(text, method)}
+              onCancel={() => navigate(listeningReturnTo)}
+            />
+          </RequireSession>
+        }
+      />
 
-      {screen === "core-info" && session && (
-        <CoreInfo
-          sessionId={session.session_id}
-          productDisplayName={session.product_display_name}
-          onAskQuestion={() => setScreen("qa")}
-        />
-      )}
+      <Route
+        path="/core-info"
+        element={
+          <RequireSession session={session}>
+            {session && (
+              <CoreInfo
+                sessionId={session.session_id}
+                productDisplayName={session.product_display_name}
+                onAskQuestion={() => navigate("/qa")}
+              />
+            )}
+          </RequireSession>
+        }
+      />
 
-      {screen === "qa" && (
-        <QandA
-          history={qaHistory}
-          submitting={submitting}
-          onSubmitTyped={(text) => submitQuery(text, "typed")}
-          onOpenListening={() => openListening("qa")}
-          onEndSession={() => setScreen("closing")}
-        />
-      )}
+      <Route
+        path="/qa"
+        element={
+          <RequireSession session={session}>
+            <QandA
+              history={qaHistory}
+              submitting={submitting}
+              onSubmitTyped={(text) => submitQuery(text, "typed")}
+              onOpenListening={() => openListening("/qa")}
+              onEndSession={() => navigate("/closing")}
+            />
+          </RequireSession>
+        }
+      />
 
-      {screen === "closing" && <Closing onSessionEnd={handleEndSession} />}
-    </>
+      <Route
+        path="/closing"
+        element={
+          <RequireSession session={session}>
+            <Closing onSessionEnd={handleEndSession} />
+          </RequireSession>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
