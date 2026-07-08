@@ -1,0 +1,477 @@
+/* Mobile-first base styles; tablet (primary kiosk target) and desktop breakpoints below expand
+   spacing/typography rather than restructure layout, keeping one responsive app instead of three. */
+
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  text-decoration: underline;
+  min-height: var(--tap-target-min);
+  font-size: 1rem;
+}
+
+/* Listening and Closing screens use a dark pine-teal background - the default ghost/link/primary
+   button colors above are tuned for light backgrounds and would fail contrast (or be literally
+   invisible, in the primary button's case, since it's the same color as this background). */
+.listening-screen .link-button,
+.closing-screen .link-button {
+  color: white;
+}
+
+.listening-screen .btn-primary {
+  background: white;
+  color: var(--color-primary);
+  border-color: white;
+}
+
+.listening-screen .btn-primary:hover {
+  background: #eee9df;
+}
+
+.listening-screen .btn-ghost,
+.closing-screen .btn-ghost {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Researcher setup ---------- */
+
+.researcher-screen {
+  background: #eee9df;
+}
+
+.researcher-card {
+  background: white;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  max-width: 480px;
+  width: 100%;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--color-accent);
+  color: white;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  margin-bottom: var(--space-2);
+}
+
+.researcher-card fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target-min);
+  font-size: 1.1rem;
+}
+
+.radio-row input {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---------- Welcome ---------- */
+
+.welcome-content {
+  max-width: 560px;
+  text-align: center;
+}
+
+.welcome-content h1 {
+  font-size: 2.5rem;
+  color: var(--color-primary);
+}
+
+.lede {
+  font-size: 1.25rem;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.mic-icon {
+  font-size: 1.3rem;
+}
+
+/* ---------- Listening ---------- */
+
+.listening-screen {
+  background: var(--color-primary);
+  color: white;
+}
+
+.listening-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 480px;
+  width: 100%;
+}
+
+.listening-status {
+  font-size: 1.15rem;
+  text-align: center;
+  min-height: 1.6em;
+}
+
+.mic-button {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid white;
+  background: var(--color-accent);
+  color: white;
+  font-size: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-button-small {
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  background: white;
+  color: var(--color-primary);
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 60px;
+}
+
+.waveform-bar {
+  width: 8px;
+  height: 16px;
+  background: white;
+  border-radius: 4px;
+}
+
+.waveform-active .waveform-bar {
+  animation: waveform-bounce 0.9s ease-in-out infinite;
+}
+
+@keyframes waveform-bounce {
+  0%,
+  100% {
+    height: 16px;
+  }
+  50% {
+    height: 48px;
+  }
+}
+
+.typed-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.typed-fallback label {
+  font-weight: 600;
+}
+
+.typed-fallback input {
+  min-height: var(--tap-target-min);
+  font-size: 1.1rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+}
+
+/* ---------- Core info ---------- */
+
+.info-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  max-width: 640px;
+  width: 100%;
+  box-shadow: 0 2px 12px rgba(20, 32, 30, 0.08);
+}
+
+.info-card h2 {
+  color: var(--color-primary);
+}
+
+.info-row {
+  margin-bottom: var(--space-2);
+}
+
+.info-label {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.info-row p {
+  margin: 0.25rem 0 0 0;
+  font-size: 1.15rem;
+}
+
+.warnings-block {
+  background: var(--color-warning-bg);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.warnings-block ul {
+  margin: 0.5rem 0 0 1.2rem;
+  padding: 0;
+}
+
+.warnings-block li {
+  margin-bottom: 0.4rem;
+}
+
+.prompt-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: var(--space-3);
+}
+
+/* ---------- Q&A ---------- */
+
+.qa-screen {
+  align-items: stretch;
+  padding: var(--space-2);
+}
+
+.qa-history {
+  flex: 1;
+  overflow-y: auto;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-2) 0;
+}
+
+.qa-empty {
+  text-align: center;
+  margin-top: var(--space-4);
+}
+
+.qa-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.qa-bubble {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  max-width: 85%;
+  font-size: 1.05rem;
+}
+
+.qa-bubble-participant {
+  align-self: flex-end;
+  background: var(--color-primary);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.qa-bubble-system {
+  align-self: flex-start;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: 4px;
+}
+
+.qa-bubble-deflected {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning);
+}
+
+.deflect-tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-warning);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.qa-bubble-loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.qa-input-bar {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  max-width: 720px;
+  width: 100%;
+  margin: var(--space-2) auto 0 auto;
+}
+
+.qa-input-bar input {
+  flex: 1;
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  font-size: 1.05rem;
+}
+
+.qa-input-bar .btn {
+  width: auto;
+  min-width: 90px;
+}
+
+.end-session-btn {
+  max-width: 720px;
+  width: 100%;
+  margin: var(--space-2) auto 0 auto;
+}
+
+/* ---------- Closing ---------- */
+
+.closing-screen {
+  background: var(--color-primary);
+  color: white;
+}
+
+.closing-content {
+  max-width: 480px;
+  text-align: center;
+}
+
+.closing-content h1 {
+  color: white;
+}
+
+.closing-content .muted {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---------- Shared text helpers ---------- */
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.error-text {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+/* ---------- Tablet (primary kiosk target) ---------- */
+
+@media (min-width: 640px) {
+  body {
+    font-size: 20px;
+  }
+
+  .btn {
+    font-size: 1.25rem;
+    min-height: 68px;
+  }
+
+  .welcome-content h1 {
+    font-size: 3.2rem;
+  }
+
+  .welcome-actions {
+    flex-direction: row;
+  }
+
+  .mic-button {
+    width: 160px;
+    height: 160px;
+    font-size: 4rem;
+  }
+}
+
+/* ---------- Desktop browser ---------- */
+
+@media (min-width: 1280px) {
+  .screen {
+    padding: var(--space-5);
+  }
+
+  .researcher-card,
+  .info-card {
+    max-width: 560px;
+  }
+
+  .welcome-content {
+    max-width: 640px;
+  }
+}

@@ -1,0 +1,95 @@
+:root {
+  /* Brand colors - deep pine teal primary, ochre accent, brick red reserved for warnings only */
+  --color-primary: #1f4c46;
+  --color-primary-dark: #163731;
+  --color-primary-light: #2e6960;
+  --color-accent: #b98639;
+  --color-accent-dark: #93692b;
+  --color-warning: #9c3b32;
+  --color-warning-bg: #fbeceb;
+
+  --color-bg: #faf8f4;
+  --color-surface: #ffffff;
+  --color-text: #14201e;
+  --color-text-muted: #4a5a57;
+  --color-border: #d8d3c8;
+
+  --color-focus-ring: #b98639;
+
+  /* Typography - Atkinson Hyperlegible for body/UI (accessibility choice for older adult
+     participants), Fraunces for display headings, IBM Plex Mono for labels/data */
+  --font-body: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --tap-target-min: 60px;
+
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-5: 3rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0 0 var(--space-2) 0;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Accessibility floor: visible focus states everywhere, large tap targets */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+button {
+  min-height: var(--tap-target-min);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

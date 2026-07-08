@@ -1,0 +1,24 @@
+# Secrets - never commit actual .env files, only .env.example
+.env
+.env.local
+*.env
+!.env.example
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+backend/otc.db
+backend/data/vector_index/*.faiss
+backend/data/vector_index/meta.json
+
+# Node
+node_modules/
+dist/
+build/
+
+# Editor/OS
+.DS_Store
+*.log
+.vscode/
+.idea/
