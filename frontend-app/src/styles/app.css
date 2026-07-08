@@ -2,6 +2,7 @@
    spacing/typography rather than restructure layout, keeping one responsive app instead of three. */
 
 .screen {
+  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -55,6 +56,24 @@
   text-decoration: underline;
   min-height: var(--tap-target-min);
   font-size: 1rem;
+}
+
+.back-button {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  min-height: 44px;
+  z-index: 10;
 }
 
 /* Listening and Closing screens use a dark pine-teal background - the default ghost/link/primary
@@ -321,7 +340,6 @@
 
 .qa-empty {
   text-align: center;
-  margin-top: var(--space-4);
 }
 
 .qa-turn {
@@ -549,6 +567,13 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.chat-history:has(.qa-turn) {
+  justify-content: flex-end;
 }
 
 .chat-live-transcript {
@@ -623,128 +648,126 @@
   padding: var(--space-4) var(--space-3);
 }
 
-.avatar {
+/* Abstract orb - no face, deliberately non-representational. */
+.orb {
   position: relative;
-  width: 240px;
+  width: 280px;
   height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.avatar-svg {
-  width: 100%;
-  height: 100%;
+.orb-core {
   position: relative;
-  z-index: 1;
-}
-
-.avatar-ground-shadow {
-  fill: #1a2422;
-  opacity: 0.1;
-}
-
-.avatar-body-highlight {
-  fill: none;
-  stroke: white;
-  stroke-width: 4;
-  stroke-linecap: round;
-  opacity: 0.5;
-}
-
-.avatar-head-highlight {
-  fill: white;
-  opacity: 0.45;
-}
-
-.avatar-visor-highlight {
-  fill: none;
-  stroke: #5a6a72;
-  stroke-width: 2;
-  stroke-linecap: round;
-  opacity: 0.6;
-}
-
-.avatar-eye-spark {
-  fill: white;
-  opacity: 0.9;
-}
-
-.avatar-chest-bar {
-  fill: var(--color-accent);
-  opacity: 0.35;
-  transform-origin: bottom;
-}
-
-.avatar-pulse-ring {
-  position: absolute;
-  inset: 4px 12px 44px 12px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
-  border: 3px solid var(--color-accent);
+  background: radial-gradient(circle at 35% 30%, #3a7269 0%, var(--color-primary) 55%, var(--color-primary-dark) 100%);
+  box-shadow:
+    0 12px 40px rgba(31, 76, 70, 0.35),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.2),
+    inset 0 12px 20px rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--color-accent);
   opacity: 0;
 }
 
-.avatar-idle .avatar-svg {
-  animation: avatar-breathe 4s ease-in-out infinite;
+.orb-ring-inner {
+  inset: -10px;
 }
 
-.avatar-listening .avatar-pulse-ring {
-  opacity: 1;
-  animation: avatar-pulse 1.3s ease-out infinite;
+.orb-ring-outer {
+  inset: -24px;
 }
 
-.avatar-listening .avatar-eye {
-  animation: avatar-eye-glow 1.3s ease-in-out infinite;
+.orb-bar {
+  display: inline-block;
+  width: 6px;
+  height: 24px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.85);
+  transform-origin: center;
 }
 
-.avatar-thinking .avatar-svg {
-  animation: avatar-tilt 1.6s ease-in-out infinite;
+/* idle: slow breathing scale, no rings, bars settled low */
+.orb-idle .orb-core {
+  animation: orb-breathe 4s ease-in-out infinite;
+}
+.orb-idle .orb-bar {
+  height: 6px;
+  opacity: 0.6;
 }
 
-.avatar-thinking .avatar-chest-bar {
-  animation: avatar-chest-cycle 1.4s ease-in-out infinite;
+/* listening: expanding rings + bars react as if picking up sound */
+.orb-listening .orb-ring {
+  animation: orb-pulse 1.6s ease-out infinite;
 }
-.avatar-thinking .avatar-chest-bar-2 { animation-delay: 0.15s; }
-.avatar-thinking .avatar-chest-bar-3 { animation-delay: 0.3s; }
-
-.avatar-speaking .avatar-chest-bar {
-  animation: avatar-chest-talk 0.5s ease-in-out infinite;
+.orb-listening .orb-ring-outer {
+  animation-delay: 0.3s;
 }
-.avatar-speaking .avatar-chest-bar-2 { animation-delay: 0.12s; }
-.avatar-speaking .avatar-chest-bar-3 { animation-delay: 0.24s; }
-
-.avatar-speaking .avatar-eye {
-  animation: avatar-eye-glow 0.6s ease-in-out infinite;
+.orb-listening .orb-bar {
+  animation: orb-listen-bar 0.9s ease-in-out infinite;
 }
+.orb-listening .orb-bar-2 { animation-delay: 0.1s; }
+.orb-listening .orb-bar-3 { animation-delay: 0.2s; }
+.orb-listening .orb-bar-4 { animation-delay: 0.3s; }
+.orb-listening .orb-bar-5 { animation-delay: 0.4s; }
 
-@keyframes avatar-breathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-4px) scale(1.01); }
+/* thinking: core gently rotates/shimmers, bars settled */
+.orb-thinking .orb-core {
+  animation: orb-shimmer 1.8s ease-in-out infinite;
 }
-
-@keyframes avatar-pulse {
-  0% { transform: scale(0.92); opacity: 0.7; }
-  100% { transform: scale(1.2); opacity: 0; }
+.orb-thinking .orb-bar {
+  height: 6px;
+  opacity: 0.5;
 }
 
-@keyframes avatar-eye-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+/* speaking: bars animate like an equalizer, core pulses subtly */
+.orb-speaking .orb-core {
+  animation: orb-breathe 1.2s ease-in-out infinite;
+}
+.orb-speaking .orb-bar {
+  animation: orb-speak-bar 0.6s ease-in-out infinite;
+}
+.orb-speaking .orb-bar-2 { animation-delay: 0.1s; }
+.orb-speaking .orb-bar-3 { animation-delay: 0.2s; }
+.orb-speaking .orb-bar-4 { animation-delay: 0.3s; }
+.orb-speaking .orb-bar-5 { animation-delay: 0.15s; }
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
 }
 
-@keyframes avatar-tilt {
-  0%, 100% { transform: rotate(-2deg); }
-  50% { transform: rotate(2deg); }
+@keyframes orb-pulse {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
 }
 
-@keyframes avatar-chest-cycle {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
+@keyframes orb-shimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
 }
 
-@keyframes avatar-chest-talk {
-  0%, 100% { transform: scaleY(0.6); opacity: 0.5; }
-  50% { transform: scaleY(1.4); opacity: 1; }
+@keyframes orb-listen-bar {
+  0%, 100% { height: 10px; }
+  50% { height: 30px; }
+}
+
+@keyframes orb-speak-bar {
+  0%, 100% { height: 8px; }
+  50% { height: 32px; }
 }
 
 .avatar-status {

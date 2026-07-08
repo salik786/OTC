@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BackButton } from "../components/BackButton";
 import { Button } from "../components/Button";
 import { AssistantAvatar } from "../components/AssistantAvatar";
 import { useConversation } from "../hooks/useConversation";
@@ -6,12 +7,13 @@ import type { SessionStartResponse } from "../lib/api";
 
 interface Props {
   session: SessionStartResponse;
+  onBack: () => void;
   onEndSession: () => void;
 }
 
 /** Live conversation mode: the avatar is the focus (like a voice-assistant app), with a compact
  * running transcript always visible on the side rather than one big "tap to talk" interaction. */
-export function AvatarChat({ session, onEndSession }: Props) {
+export function AvatarChat({ session, onBack, onEndSession }: Props) {
   const conv = useConversation(session);
   const [showTyped, setShowTyped] = useState(false);
   const [typedText, setTypedText] = useState("");
@@ -46,6 +48,7 @@ export function AvatarChat({ session, onEndSession }: Props) {
 
   return (
     <div className="screen avatar-screen">
+      <BackButton onClick={onBack} />
       <div className="avatar-layout">
         <div className="avatar-main">
           <AssistantAvatar state={avatarState} />

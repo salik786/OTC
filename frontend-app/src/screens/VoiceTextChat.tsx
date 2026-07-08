@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BackButton } from "../components/BackButton";
 import { Button } from "../components/Button";
 import { Waveform } from "../components/Waveform";
 import { useConversation } from "../hooks/useConversation";
@@ -6,12 +7,13 @@ import type { SessionStartResponse } from "../lib/api";
 
 interface Props {
   session: SessionStartResponse;
+  onBack: () => void;
   onEndSession: () => void;
 }
 
 /** Voice + text chat: one persistent screen where the transcript is always visible while the
  * participant talks or types - no separate full-screen "listening" takeover. */
-export function VoiceTextChat({ session, onEndSession }: Props) {
+export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
   const conv = useConversation(session);
   const [typedText, setTypedText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,7 @@ export function VoiceTextChat({ session, onEndSession }: Props) {
 
   return (
     <div className="screen chat-screen">
+      <BackButton onClick={onBack} />
       <div className="chat-layout">
         <div className="chat-history" ref={listRef} aria-live="polite">
           {conv.history.length === 0 && conv.sttStatus === "idle" && (
