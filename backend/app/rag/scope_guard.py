@@ -1,12 +1,12 @@
 import json
 import re
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 from app.config import get_settings
 
 settings = get_settings()
-_anthropic_client: Anthropic | None = None
+_openai_client: OpenAI | None = None
 
 # Word-for-word fixed fallback text. Must never be paraphrased - this is a study parity
 # requirement (identical wording across Pepper and tablet, every time it fires).
@@ -34,11 +34,11 @@ _OUT_OF_SCOPE_PATTERNS = [
 _OUT_OF_SCOPE_RE = re.compile("|".join(_OUT_OF_SCOPE_PATTERNS), re.IGNORECASE)
 
 
-def _client() -> Anthropic:
-    global _anthropic_client
-    if _anthropic_client is None:
-        _anthropic_client = Anthropic(api_key=settings.anthropic_api_key)
-    return _anthropic_client
+def _client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=settings.openai_api_key)
+    return _openai_client
 
 
 def heuristic_out_of_scope(query_text: str) -> bool:
@@ -62,13 +62,16 @@ _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
 def llm_classify_in_scope(query_text: str) -> bool:
-    resp = _client().messages.create(
-        model=settings.anthropic_model,
+    resp = _client().chat.completions.create(
+        model=settings.openai_generation_model,
         max_tokens=50,
-        system=_CLASSIFY_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": query_text}],
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": _CLASSIFY_SYSTEM_PROMPT},
+            {"role": "user", "content": query_text},
+        ],
     )
-    raw = "".join(block.text for block in resp.content if block.type == "text").strip()
+    raw = (resp.choices[0].message.content or "").strip()
     raw = _FENCE_RE.sub("", raw).strip()
     try:
         return bool(json.loads(raw)["in_scope"])

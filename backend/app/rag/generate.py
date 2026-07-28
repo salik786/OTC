@@ -1,27 +1,27 @@
 import json
 import re
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 from app.config import get_settings
 from app.rag.scope_guard import FALLBACK_TEXT
 
 settings = get_settings()
-_anthropic_client: Anthropic | None = None
+_openai_client: OpenAI | None = None
 
 
-def _client() -> Anthropic:
-    global _anthropic_client
-    if _anthropic_client is None:
-        _anthropic_client = Anthropic(api_key=settings.anthropic_api_key)
-    return _anthropic_client
+def _client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=settings.openai_api_key)
+    return _openai_client
 
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
 def _strip_code_fences(raw: str) -> str:
-    """Claude sometimes wraps JSON in markdown fences despite instructions not to."""
+    """The model sometimes wraps JSON in markdown fences despite instructions not to."""
     return _FENCE_RE.sub("", raw).strip()
 
 
@@ -43,13 +43,15 @@ def generate_answer(query_text: str, chunks: list[dict]) -> str:
     excerpts = "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
     user_content = f"Leaflet excerpts:\n\n{excerpts}\n\nParticipant question: {query_text}"
 
-    resp = _client().messages.create(
-        model=settings.anthropic_model,
+    resp = _client().chat.completions.create(
+        model=settings.openai_generation_model,
         max_tokens=300,
-        system=_QA_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_content}],
+        messages=[
+            {"role": "system", "content": _QA_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
     )
-    text = "".join(block.text for block in resp.content if block.type == "text").strip()
+    text = (resp.choices[0].message.content or "").strip()
     return text or FALLBACK_TEXT
 
 
@@ -77,13 +79,16 @@ def generate_core_info(product_display_name: str, chunks: list[dict]) -> dict:
     excerpts = "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
     user_content = f"Product: {product_display_name}\n\nLeaflet excerpts:\n\n{excerpts}"
 
-    resp = _client().messages.create(
-        model=settings.anthropic_model,
+    resp = _client().chat.completions.create(
+        model=settings.openai_generation_model,
         max_tokens=1024,
-        system=_CORE_INFO_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_content}],
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": _CORE_INFO_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
     )
-    raw = "".join(block.text for block in resp.content if block.type == "text").strip()
+    raw = (resp.choices[0].message.content or "").strip()
     try:
         data = json.loads(_strip_code_fences(raw))
     except json.JSONDecodeError:
