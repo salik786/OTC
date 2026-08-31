@@ -106,7 +106,7 @@ export function Documents() {
         {error && <p className="error">{error}</p>}
       </div>
 
-      <div className="panel">
+      <div className="panel table-scroll">
         <h3>Ingested documents</h3>
         <table>
           <thead>

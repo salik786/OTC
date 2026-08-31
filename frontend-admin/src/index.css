@@ -129,9 +129,17 @@ nav button.active {
   min-width: 200px;
 }
 
+.table-scroll {
+  overflow-x: auto;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.nowrap {
+  white-space: nowrap;
 }
 
 th,

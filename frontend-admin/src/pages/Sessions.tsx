@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { api, authHeader, type Product, type SessionSummary, type Turn } from "../lib/api";
 
@@ -11,12 +11,25 @@ function formatDuration(start: string, end: string | null): string {
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
+async function downloadFromUrl(url: string, credentials: string, filename: string) {
+  const res = await fetch(url, { headers: authHeader(credentials) });
+  if (!res.ok) throw new Error(await res.text());
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export function Sessions() {
   const { credentials } = useAuth();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [platformFilter, setPlatformFilter] = useState("");
   const [productFilter, setProductFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -45,21 +58,35 @@ export function Sessions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentials, platformFilter, productFilter]);
 
+  const visibleSessions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sessions;
+    return sessions.filter(
+      (s) => s.session_id.toLowerCase().includes(q) || s.participant_id.toLowerCase().includes(q)
+    );
+  }, [sessions, search]);
+
   async function handleExport(sessionId: string) {
     if (!credentials) return;
     setDownloadError(null);
     try {
-      const res = await fetch(api.exportSessionUrl(sessionId), { headers: authHeader(credentials) });
-      if (!res.ok) throw new Error(await res.text());
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `session_${sessionId}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFromUrl(api.exportSessionUrl(sessionId), credentials, `session_${sessionId}.csv`);
     } catch {
       setDownloadError(`Failed to export session ${sessionId}.`);
+    }
+  }
+
+  async function handleExportAll(format: "csv" | "json") {
+    if (!credentials) return;
+    setDownloadError(null);
+    try {
+      const url = api.exportAllSessionsUrl(format, {
+        platform: platformFilter || undefined,
+        productSlug: productFilter || undefined,
+      });
+      await downloadFromUrl(url, credentials, `all_sessions.${format}`);
+    } catch {
+      setDownloadError(`Failed to export all sessions as ${format.toUpperCase()}.`);
     }
   }
 
@@ -85,6 +112,22 @@ export function Sessions() {
     setViewError(null);
   }
 
+  async function handleDelete(session: SessionSummary) {
+    if (!credentials) return;
+    if (
+      !confirm(
+        `Delete session ${session.session_id.slice(0, 8)} (participant ${session.participant_id})? This permanently removes it and all its turns - it cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await api.deleteSession(credentials, session.session_id);
+      await refresh();
+    } catch {
+      setDownloadError(`Failed to delete session ${session.session_id}.`);
+    }
+  }
+
   const platforms = Array.from(new Set(sessions.map((s) => s.platform)));
 
   return (
@@ -92,6 +135,13 @@ export function Sessions() {
       <h2>Recent Sessions</h2>
 
       <div className="panel form-row">
+        <input
+          type="text"
+          placeholder="Search participant or session ID"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="grow"
+        />
         <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)}>
           <option value="">All platforms</option>
           {["tablet_web", "mobile_web", "desktop_web", "android_native", "pepper", ...platforms]
@@ -113,12 +163,20 @@ export function Sessions() {
         <button onClick={refresh} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh"}
         </button>
-        <span className="muted">{sessions.length} session{sessions.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <div className="panel form-row">
+        <span className="muted">
+          {visibleSessions.length} of {sessions.length} session{sessions.length === 1 ? "" : "s"} shown
+          {platformFilter || productFilter ? " (filtered)" : ""}
+        </span>
+        <button onClick={() => handleExportAll("csv")}>Export All (CSV)</button>
+        <button onClick={() => handleExportAll("json")}>Export All (JSON)</button>
       </div>
 
       {downloadError && <p className="error">{downloadError}</p>}
 
-      <div className="panel">
+      <div className="panel table-scroll">
         <table>
           <thead>
             <tr>
@@ -136,7 +194,7 @@ export function Sessions() {
             </tr>
           </thead>
           <tbody>
-            {sessions.map((s) => (
+            {visibleSessions.map((s) => (
               <tr key={s.session_id} className={s.errors_logged > 0 ? "row-error" : ""}>
                 <td className="mono" title={s.session_id}>
                   {s.session_id.slice(0, 8)}
@@ -157,16 +215,19 @@ export function Sessions() {
                   <span className="input-tag input-tag-typed">⌨ {s.typed_turns}</span>
                 </td>
                 <td>{s.errors_logged > 0 ? <strong>{s.errors_logged}</strong> : s.errors_logged}</td>
-                <td>
+                <td className="nowrap">
                   <button onClick={() => handleView(s)}>View</button>{" "}
-                  <button onClick={() => handleExport(s.session_id)}>Export CSV</button>
+                  <button onClick={() => handleExport(s.session_id)}>Export CSV</button>{" "}
+                  <button className="danger" onClick={() => handleDelete(s)}>
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
-            {sessions.length === 0 && !loading && (
+            {visibleSessions.length === 0 && !loading && (
               <tr>
                 <td colSpan={11} className="muted">
-                  No sessions recorded yet.
+                  {sessions.length === 0 ? "No sessions recorded yet." : "No sessions match your search."}
                 </td>
               </tr>
             )}

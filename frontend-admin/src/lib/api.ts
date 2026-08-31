@@ -131,7 +131,21 @@ export const api = {
       handle<Turn[]>(r)
     ),
 
+  deleteSession: (credentials: string, sessionId: string) =>
+    fetch(`${API_BASE}/api/admin/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: authHeader(credentials),
+    }).then((r) => handle<{ deleted: string }>(r)),
+
   exportSessionUrl: (sessionId: string) => `${API_BASE}/api/sessions/${sessionId}/export`,
+
+  exportAllSessionsUrl: (format: "csv" | "json", opts: { platform?: string; productSlug?: string } = {}) => {
+    const params = new URLSearchParams();
+    params.set("format", format);
+    if (opts.platform) params.set("platform", opts.platform);
+    if (opts.productSlug) params.set("product_slug", opts.productSlug);
+    return `${API_BASE}/api/admin/sessions/export?${params.toString()}`;
+  },
 };
 
 export { API_BASE };
