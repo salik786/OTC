@@ -202,3 +202,53 @@ td {
   align-items: flex-start;
   margin-bottom: 0.5rem;
 }
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-complete {
+  background: #e3f3ea;
+  color: #1f6b46;
+}
+
+.status-open {
+  background: #fff4e0;
+  color: #93692b;
+}
+
+.row-error {
+  background: #fbeceb;
+}
+
+.turn-deflected {
+  border-left: 3px solid #9c3b32;
+}
+
+.input-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.input-tag-voice {
+  background: #e6f0fa;
+  color: #1f5f8b;
+}
+
+.input-tag-typed {
+  background: #f0ebe0;
+  color: #93692b;
+}
+
+.input-tag-system {
+  background: #ececec;
+  color: #555;
+}

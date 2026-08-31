@@ -129,4 +129,17 @@ class SessionSummaryOut(BaseModel):
     start_time: datetime
     end_time: datetime | None
     total_turns: int
+    voice_turns: int
+    typed_turns: int
     errors_logged: int
+
+
+class TurnOut(BaseModel):
+    turn_number: int
+    input_method: str
+    query_text: str
+    retrieved_chunk_ids: list[str]
+    response_text: str
+    in_scope: bool
+    latency_ms: float
+    timestamp: datetime

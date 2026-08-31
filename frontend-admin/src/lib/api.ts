@@ -64,7 +64,20 @@ export interface SessionSummary {
   start_time: string;
   end_time: string | null;
   total_turns: number;
+  voice_turns: number;
+  typed_turns: number;
   errors_logged: number;
+}
+
+export interface Turn {
+  turn_number: number;
+  input_method: string;
+  query_text: string;
+  retrieved_chunk_ids: string[];
+  response_text: string;
+  in_scope: boolean;
+  latency_ms: number;
+  timestamp: string;
 }
 
 export const api = {
@@ -103,9 +116,19 @@ export const api = {
       body: JSON.stringify({ query, product_slug: productSlug, top_k: topK }),
     }).then((r) => handle<{ retrieved_chunks: RetrievedChunk[]; latency_ms: number }>(r)),
 
-  listSessions: (credentials: string, limit = 50) =>
-    fetch(`${API_BASE}/api/admin/sessions?limit=${limit}`, { headers: authHeader(credentials) }).then((r) =>
+  listSessions: (credentials: string, opts: { limit?: number; platform?: string; productSlug?: string } = {}) => {
+    const params = new URLSearchParams();
+    params.set("limit", String(opts.limit ?? 100));
+    if (opts.platform) params.set("platform", opts.platform);
+    if (opts.productSlug) params.set("product_slug", opts.productSlug);
+    return fetch(`${API_BASE}/api/admin/sessions?${params.toString()}`, { headers: authHeader(credentials) }).then((r) =>
       handle<SessionSummary[]>(r)
+    );
+  },
+
+  getSessionTurns: (credentials: string, sessionId: string) =>
+    fetch(`${API_BASE}/api/admin/sessions/${sessionId}/turns`, { headers: authHeader(credentials) }).then((r) =>
+      handle<Turn[]>(r)
     ),
 
   exportSessionUrl: (sessionId: string) => `${API_BASE}/api/sessions/${sessionId}/export`,
