@@ -1,0 +1,10 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://qisdk.softbankrobotics.com/sdk/maven" }
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:7.4.2"
+    }
+}

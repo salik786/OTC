@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pepper's onboard Android 6.0 ships a trust store predating Let's Encrypt's ISRG Root X2 (issued
+  2020), which is what the Railway backend's certificate chains to. Without this, ApiClient's HTTPS
+  calls fail with "Trust anchor for certification path not found" even though the backend is fully
+  reachable and healthy - confirmed via adb logcat on the physical robot. Bundling both current
+  Let's Encrypt roots (X1 and X2, in case the chain rotates) alongside the system store fixes this
+  without weakening validation otherwise.
+-->
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
