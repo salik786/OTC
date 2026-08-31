@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BackButton } from "../components/BackButton";
 import { Button } from "../components/Button";
-import { useTTS } from "../hooks/useTTS";
 import { api, type CoreInfoResponse } from "../lib/api";
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 export function CoreInfo({ sessionId, productDisplayName, onBack, onAskQuestion }: Props) {
   const [data, setData] = useState<CoreInfoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { speak } = useTTS();
   const fetchedRef = useRef(false);
 
   useEffect(() => {
@@ -22,10 +20,7 @@ export function CoreInfo({ sessionId, productDisplayName, onBack, onAskQuestion 
     fetchedRef.current = true;
     api
       .coreInfo(sessionId)
-      .then((res) => {
-        setData(res);
-        speak(res.full_text);
-      })
+      .then((res) => setData(res))
       .catch(() => setError("Could not load information about this medicine. Please tell the researcher."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);

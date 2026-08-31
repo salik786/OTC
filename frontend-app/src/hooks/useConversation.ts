@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type InputMethod, type SessionStartResponse } from "../lib/api";
 import { useSTT } from "./useSTT";
-import { useTTS } from "./useTTS";
+import { useTTS, stopAllSpeech } from "./useTTS";
 import type { QATurn } from "../types";
 
 /** Shared conversation logic (history, submitting a turn, voice capture) used by both the
@@ -12,6 +12,16 @@ export function useConversation(session: SessionStartResponse | null) {
   const [submitting, setSubmitting] = useState(false);
   const stt = useSTT();
   const tts = useTTS();
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      // The participant may navigate away while an answer is still generating - don't let it
+      // start speaking on a screen they've already left.
+      stopAllSpeech();
+    };
+  }, []);
 
   const submitText = useCallback(
     async (text: string, method: InputMethod) => {
@@ -23,7 +33,7 @@ export function useConversation(session: SessionStartResponse | null) {
           ...h,
           { turnNumber: res.turn_number, queryText: text.trim(), answerText: res.answer_text, inScope: res.in_scope },
         ]);
-        tts.speak(res.answer_text);
+        if (mountedRef.current) tts.speak(res.answer_text);
       } catch {
         setHistory((h) => [
           ...h,
@@ -56,6 +66,7 @@ export function useConversation(session: SessionStartResponse | null) {
     submitText,
     startVoice,
     stopVoiceAndSubmit,
+    stopSpeaking: tts.stop,
     cancelVoice: stt.cancel,
     sttStatus: stt.status,
     sttError: stt.error,

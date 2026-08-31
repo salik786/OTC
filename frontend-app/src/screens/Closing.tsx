@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useTTS } from "../hooks/useTTS";
 
 const CLOSING_TEXT =
   "Thank you for using this system. I hope the information was helpful. The researcher will now ask you a few questions. Goodbye!";
@@ -9,14 +8,12 @@ interface Props {
 }
 
 export function Closing({ onSessionEnd }: Props) {
-  const { speak } = useTTS();
   const firedRef = useRef(false);
 
   useEffect(() => {
     if (firedRef.current) return;
     firedRef.current = true;
     onSessionEnd();
-    speak(CLOSING_TEXT);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -66,7 +66,13 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
   if (conv.sttStatus === "recording") statusText = "Listening...";
   else if (conv.sttStatus === "transcribing") statusText = "Got it - one moment...";
   else if (conv.submitting) statusText = "Thinking...";
+  else if (conv.isSpeaking) statusText = "Speaking...";
   else if (conv.sttError) statusText = conv.sttError;
+
+  function handleStop() {
+    voiceModeActiveRef.current = false;
+    conv.stopSpeaking();
+  }
 
   return (
     <div className="screen avatar-screen">
@@ -76,7 +82,14 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
           <AssistantAvatar state={avatarState} />
           <p className="avatar-status" aria-live="polite">{statusText}</p>
 
-          {!showTyped ? (
+          {conv.isSpeaking ? (
+            <div className="avatar-dock">
+              <button className="mic-button-compact mic-stop" onClick={handleStop} aria-label="Stop speaking">
+                ⏹
+              </button>
+              <span className="muted">Stop</span>
+            </div>
+          ) : !showTyped ? (
             <div className="avatar-dock">
               <button
                 className={`mic-button-compact ${conv.sttStatus === "recording" ? "mic-recording" : ""}`}

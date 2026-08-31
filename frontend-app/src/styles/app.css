@@ -615,7 +615,8 @@
   min-width: 90px;
 }
 
-.mic-recording {
+.mic-recording,
+.mic-stop {
   background: var(--color-warning) !important;
   border-color: var(--color-warning) !important;
   color: white !important;
@@ -806,6 +807,11 @@
 
 .mic-button-compact.mic-recording {
   background: var(--color-warning) !important;
+}
+
+.mic-button-compact.mic-stop {
+  background: var(--color-warning) !important;
+  font-size: 1.1rem;
 }
 
 .avatar-dock .link-button {

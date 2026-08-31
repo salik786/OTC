@@ -80,6 +80,35 @@ def llm_classify_in_scope(query_text: str) -> bool:
         return False
 
 
+_CHECKIN_RE = re.compile(r"\b(can you hear me|are you (there|listening)|anyone (there|listening))\b", re.IGNORECASE)
+_GREETING_RE = re.compile(r"^\s*(hi|hello|hey|good (morning|afternoon|evening))[\s!.?]*$", re.IGNORECASE)
+_FAREWELL_RE = re.compile(
+    r"^\s*(bye( bye)?|goodbye|good bye|see you( later)?|that'?s all([, ]*thanks)?|i'?m done)[\s!.?]*$", re.IGNORECASE
+)
+_THANKS_RE = re.compile(r"^\s*(thanks?( you)?( so much)?|ok(ay)?|great|cool|alright|got it|sounds good)[\s!.?]*$", re.IGNORECASE)
+
+_CONVERSATIONAL_REPLIES: list[tuple[re.Pattern, str]] = [
+    (_CHECKIN_RE, "Yes, I can hear you. Please go ahead and ask your question about this medicine."),
+    (_GREETING_RE, "Hello! I'm here to help you understand this medicine. What would you like to know?"),
+    (_FAREWELL_RE, "Goodbye! Take care, and don't hesitate to ask if you have more questions."),
+    (_THANKS_RE, "You're welcome! Let me know if you have any other questions about this medicine."),
+]
+
+
+def conversational_reply(query_text: str) -> str | None:
+    """Short-circuits small talk (greetings, farewells, 'can you hear me' checks) with a natural
+    reply instead of running it through medical scope classification. These aren't medical
+    questions at all, so the fixed pharmacist-deflection text was firing on completely benign
+    utterances like "bye bye" or "can you hear me" - correct per the letter of the scope rules,
+    but broken as a live voice conversation. Checked before retrieval/classification, not after,
+    so it costs nothing extra and can never be overridden by a bad LLM classification."""
+    text = query_text.strip()
+    for pattern, reply in _CONVERSATIONAL_REPLIES:
+        if pattern.search(text):
+            return reply
+    return None
+
+
 def is_in_scope(query_text: str, chunks: list[dict]) -> bool:
     """Three gates, all must pass: retrieval found something grounded, the heuristic pattern
     filter doesn't flag it, and the LLM classifier agrees. Any single failure deflects."""

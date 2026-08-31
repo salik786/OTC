@@ -76,14 +76,20 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
             onKeyDown={(e) => e.key === "Enter" && handleTypedSubmit()}
             aria-label="Type your question"
           />
-          <button
-            className={`mic-button-small ${conv.sttStatus === "recording" ? "mic-recording" : ""}`}
-            onClick={handleMicTap}
-            disabled={conv.sttStatus === "transcribing"}
-            aria-label={conv.sttStatus === "recording" ? "Stop and send" : "Ask by voice"}
-          >
-            🎙
-          </button>
+          {conv.isSpeaking ? (
+            <button className="mic-button-small mic-stop" onClick={conv.stopSpeaking} aria-label="Stop speaking">
+              ⏹
+            </button>
+          ) : (
+            <button
+              className={`mic-button-small ${conv.sttStatus === "recording" ? "mic-recording" : ""}`}
+              onClick={handleMicTap}
+              disabled={conv.sttStatus === "transcribing"}
+              aria-label={conv.sttStatus === "recording" ? "Stop and send" : "Ask by voice"}
+            >
+              🎙
+            </button>
+          )}
           <Button variant="primary" onClick={handleTypedSubmit} disabled={!typedText.trim() || conv.submitting}>
             Ask
           </Button>
