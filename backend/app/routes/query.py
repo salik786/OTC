@@ -31,8 +31,10 @@ def _next_turn_number(db: DBSession, session_id: str) -> int:
 def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     session = _get_session_or_404(db, req.session_id)
 
+    product = db.query(Product).filter(Product.id == session.product_id).first()
+
     start = time.perf_counter()
-    small_talk = conversational_reply(req.query_text)
+    small_talk = conversational_reply(req.query_text, product.display_name if product else None)
     if small_talk is not None:
         # Greetings/farewells/"can you hear me" checks aren't medical questions - skip
         # retrieval and scope classification entirely and reply naturally.

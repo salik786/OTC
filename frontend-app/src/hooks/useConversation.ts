@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type InputMethod, type SessionStartResponse } from "../lib/api";
 import { useSTT } from "./useSTT";
 import { useTTS, stopAllSpeech } from "./useTTS";
+import { useThinkingTone } from "./useThinkingTone";
 import type { QATurn } from "../types";
 
 /** Shared conversation logic (history, submitting a turn, voice capture) used by both the
@@ -13,6 +14,8 @@ export function useConversation(session: SessionStartResponse | null) {
   const stt = useSTT();
   const tts = useTTS();
   const mountedRef = useRef(true);
+
+  useThinkingTone(submitting);
 
   useEffect(() => {
     return () => {

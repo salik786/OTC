@@ -126,11 +126,22 @@
   width: 100%;
   min-height: var(--tap-target-min);
   font-size: 1.1rem;
-  padding: 0 var(--space-2);
+  padding: 0 2.75rem 0 var(--space-2);
   border-radius: var(--radius-md);
   border: 2px solid var(--color-border);
-  background: white;
+  background-color: white;
   margin-bottom: var(--space-2);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%231F4C46'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1.25rem;
+  cursor: pointer;
+}
+
+.product-select:focus-visible {
+  border-color: var(--color-focus-ring);
 }
 
 .disclaimer-small {
@@ -459,8 +470,9 @@
     font-size: 3.2rem;
   }
 
-  .welcome-actions {
-    flex-direction: row;
+  .researcher-card,
+  .info-card {
+    max-width: 600px;
   }
 
   .mic-button {
@@ -475,11 +487,6 @@
 @media (min-width: 1280px) {
   .screen {
     padding: var(--space-5);
-  }
-
-  .researcher-card,
-  .info-card {
-    max-width: 560px;
   }
 
   .welcome-content {
