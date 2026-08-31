@@ -70,7 +70,7 @@ public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCal
 
     private ScrollView buildRoot() {
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackground(UiKit.screenBackground());
+        scroll.setBackground(UiKit.screenBackground(this));
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);

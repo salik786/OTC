@@ -141,7 +141,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
     private LinearLayout buildRoot() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setBackground(UiKit.screenBackground());
+        col.setBackground(UiKit.screenBackground(this));
         col.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 16), UiKit.dp(this, 16), UiKit.dp(this, 16));
 
         LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(

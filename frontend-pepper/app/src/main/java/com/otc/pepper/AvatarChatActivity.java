@@ -142,7 +142,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     private LinearLayout buildRoot() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackground(UiKit.screenBackground());
+        root.setBackground(UiKit.screenBackground(this));
         root.setPadding(UiKit.dp(this, 24), UiKit.dp(this, 16), UiKit.dp(this, 24), UiKit.dp(this, 16));
 
         LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(

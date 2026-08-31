@@ -93,7 +93,7 @@ public class ResearcherSetupActivity extends RobotActivity implements RobotLifec
 
     private ScrollView buildRoot() {
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackground(UiKit.screenBackground());
+        scroll.setBackground(UiKit.screenBackground(this));
 
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);

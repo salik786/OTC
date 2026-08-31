@@ -2,9 +2,16 @@ package com.otc.pepper;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -46,12 +53,84 @@ final class UiKit {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, ctx.getResources().getDisplayMetrics());
     }
 
-    /** The app's mint gradient background - apply to every screen's root view so the whole app
-     * reads as one consistent "MedCheck" surface instead of a flat cream fill. */
-    static Drawable screenBackground() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+    /** The app's mint gradient background PLUS the same faint scattered medical-icon watermark
+     * (heartbeat squiggle, bandage cross, capsule, footsteps, checkmark circle) as
+     * frontend-app/src/styles/tokens.css's tiled SVG - apply to every screen's root view so the
+     * whole app reads as one consistent "MedCheck" surface instead of a flat gradient with no
+     * texture. Needs a Context to render the repeating tile as a bitmap (Android's VectorDrawable
+     * has no built-in tile mode, unlike a CSS background-image). */
+    static Drawable screenBackground(Context ctx) {
+        GradientDrawable gradient = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFFE9F5F1, COLOR_BG, 0xFFEFF6F1});
-        return d;
+
+        Bitmap tileBmp = buildWatermarkTile(ctx);
+        BitmapDrawable tile = new BitmapDrawable(ctx.getResources(), tileBmp);
+        tile.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+
+        return new LayerDrawable(new Drawable[]{gradient, tile});
+    }
+
+    private static Bitmap buildWatermarkTile(Context ctx) {
+        int size = dp(ctx, 220);
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+
+        Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setColor(COLOR_PRIMARY);
+        stroke.setAlpha(16);
+        stroke.setStrokeWidth(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1.4f, ctx.getResources().getDisplayMetrics()));
+        stroke.setStrokeCap(Paint.Cap.ROUND);
+
+        float s = size / 160f; // scale factor so the hand-tuned coordinates below stay proportional
+
+        // Heartbeat squiggle, top-left.
+        Path heartbeat = new Path();
+        heartbeat.moveTo(4 * s, 30 * s);
+        heartbeat.lineTo(24 * s, 30 * s);
+        heartbeat.lineTo(30 * s, 18 * s);
+        heartbeat.lineTo(36 * s, 42 * s);
+        heartbeat.lineTo(42 * s, 26 * s);
+        heartbeat.lineTo(48 * s, 30 * s);
+        heartbeat.lineTo(70 * s, 30 * s);
+        c.drawPath(heartbeat, stroke);
+
+        // Bandage cross, top-right.
+        c.drawCircle(130 * s, 24 * s, 10 * s, stroke);
+        c.drawLine(130 * s, 16 * s, 130 * s, 32 * s, stroke);
+        c.drawLine(122 * s, 24 * s, 138 * s, 24 * s, stroke);
+
+        // Capsule, mid-left, rotated.
+        c.save();
+        c.rotate(45f, 34 * s, 68 * s);
+        c.drawRoundRect(14 * s, 60 * s, 54 * s, 76 * s, 8 * s, 8 * s, stroke);
+        c.drawLine(30 * s, 60 * s, 30 * s, 76 * s, stroke);
+        c.restore();
+
+        // Heart outline, center-right.
+        Path heart = new Path();
+        heart.moveTo(122 * s, 82 * s);
+        heart.cubicTo(112 * s, 68 * s, 92 * s, 82 * s, 122 * s, 106 * s);
+        heart.cubicTo(152 * s, 82 * s, 132 * s, 68 * s, 122 * s, 82 * s);
+        c.drawPath(heart, stroke);
+
+        // Checkmark circle, bottom-left.
+        c.drawCircle(24 * s, 128 * s, 12 * s, stroke);
+        Path check = new Path();
+        check.moveTo(18 * s, 128 * s);
+        check.lineTo(22 * s, 133 * s);
+        check.lineTo(31 * s, 122 * s);
+        c.drawPath(check, stroke);
+
+        // Footsteps dots, bottom-right.
+        Path steps = new Path();
+        steps.moveTo(112 * s, 150 * s);
+        steps.quadTo(120 * s, 138 * s, 128 * s, 150 * s);
+        steps.moveTo(128 * s, 150 * s);
+        steps.quadTo(136 * s, 138 * s, 144 * s, 150 * s);
+        c.drawPath(steps, stroke);
+
+        return bmp;
     }
 
     static Button primaryButton(Context ctx, String text) {
@@ -227,7 +306,10 @@ final class UiKit {
         wordmark.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 16 : 22);
         row.addView(wordmark);
 
-        col.addView(row);
+        android.widget.LinearLayout.LayoutParams rowLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.gravity = Gravity.CENTER_HORIZONTAL;
+        col.addView(row, rowLp);
 
         if (!compact) {
             TextView tagline = new TextView(ctx);

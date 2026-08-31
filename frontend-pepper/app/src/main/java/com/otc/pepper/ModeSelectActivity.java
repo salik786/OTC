@@ -54,7 +54,7 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
-        col.setBackground(UiKit.screenBackground());
+        col.setBackground(UiKit.screenBackground(this));
         col.setPadding(UiKit.dp(this, 24), UiKit.dp(this, 16), UiKit.dp(this, 24), UiKit.dp(this, 24));
 
         LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(
