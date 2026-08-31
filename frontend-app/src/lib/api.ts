@@ -34,6 +34,12 @@ export interface QueryResponse {
   turn_number: number;
 }
 
+export interface Product {
+  id: string;
+  slug: string;
+  display_name: string;
+}
+
 export interface CoreInfoResponse {
   product_name: string;
   used_for: string | null;
@@ -54,6 +60,8 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  listProducts: () => fetch(`${API_BASE}/api/products`).then((r) => handle<Product[]>(r)),
+
   startSession: (platform: Platform, productSlug: string, deviceInfo: DeviceInfo) =>
     fetch(`${API_BASE}/api/session/start`, {
       method: "POST",

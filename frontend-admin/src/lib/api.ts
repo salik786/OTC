@@ -87,9 +87,10 @@ export const api = {
   listDocuments: (credentials: string) =>
     fetch(`${API_BASE}/api/admin/documents`, { headers: authHeader(credentials) }).then((r) => handle<DocumentOut[]>(r)),
 
-  uploadDocument: (credentials: string, productSlug: string, file: File) => {
+  uploadDocument: (credentials: string, productSlug: string, file: File, productDisplayName?: string) => {
     const form = new FormData();
     form.append("product_slug", productSlug);
+    if (productDisplayName) form.append("product_display_name", productDisplayName);
     form.append("file", file);
     return fetch(`${API_BASE}/api/admin/documents`, {
       method: "POST",

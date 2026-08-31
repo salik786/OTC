@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session as DBSession
 from app.auth import require_admin
 from app.db.models import Chunk, Document, Product, SessionRecord, Turn
 from app.db.session import get_db
-from app.rag.ingest import delete_document, ingest_document
+from app.rag.ingest import delete_document, get_or_create_product, ingest_document
 from app.rag.retrieve import retrieve
 from app.schemas import DocumentChunkOut, DocumentOut, ProductOut, RetrievedChunk, SessionSummaryOut, TestRetrievalRequest, TestRetrievalResponse, TurnOut
 
@@ -32,9 +32,14 @@ def list_products(db: DBSession = Depends(get_db)) -> list[ProductOut]:
 async def upload_document(
     request: Request,
     product_slug: str = Form(...),
+    product_display_name: str | None = Form(None),
     file: UploadFile = File(...),
     db: DBSession = Depends(get_db),
 ) -> DocumentOut:
+    # Pre-create the product with the given display name if this slug is new - ingest_document's
+    # own get_or_create_product would otherwise default the name to a title-cased slug, which
+    # loses the researcher's intended product name (e.g. "Daily Multivitamin" vs "Multivitamin").
+    get_or_create_product(db, product_slug, product_display_name)
     file_bytes = await file.read()
     document = ingest_document(db, product_slug, file.filename or "leaflet", file_bytes)
     product = db.query(Product).filter(Product.id == document.product_id).first()

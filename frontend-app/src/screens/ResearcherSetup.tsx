@@ -1,10 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../components/Button";
-
-const PRODUCTS = [
-  { slug: "paracetamol", label: "Paracetamol" },
-  { slug: "multivitamin", label: "Multivitamin" },
-];
+import { api, type Product } from "../lib/api";
 
 interface Props {
   onTellMe: (productSlug: string) => void;
@@ -14,7 +10,19 @@ interface Props {
 }
 
 export function ResearcherSetup({ onTellMe, onAskQuestion, starting, error }: Props) {
-  const [productSlug, setProductSlug] = useState(PRODUCTS[0].slug);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productSlug, setProductSlug] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .listProducts()
+      .then((prods) => {
+        setProducts(prods);
+        if (prods.length > 0) setProductSlug(prods[0].slug);
+      })
+      .catch(() => setLoadError("Could not load the medicine list. Check the connection and reload."));
+  }, []);
 
   return (
     <div className="screen researcher-screen">
@@ -33,24 +41,29 @@ export function ResearcherSetup({ onTellMe, onAskQuestion, starting, error }: Pr
           className="product-select"
           value={productSlug}
           onChange={(e) => setProductSlug(e.target.value)}
+          disabled={products.length === 0}
         >
-          {PRODUCTS.map((p) => (
+          {products.map((p) => (
             <option key={p.slug} value={p.slug}>
-              {p.label}
+              {p.display_name}
             </option>
           ))}
         </select>
 
+        {loadError && <p className="error-text">{loadError}</p>}
+        {!loadError && products.length === 0 && (
+          <p className="error-text">No medicines are set up yet. Ask a researcher to upload one in the admin panel.</p>
+        )}
         {error && <p className="error-text">{error}</p>}
 
         <div className="welcome-actions">
-          <Button variant="primary" onClick={() => onTellMe(productSlug)} disabled={starting}>
+          <Button variant="primary" onClick={() => onTellMe(productSlug)} disabled={starting || !productSlug}>
             {starting ? "Starting..." : "Tell me about this medicine"}
           </Button>
           <Button
             variant="secondary"
             onClick={() => onAskQuestion(productSlug)}
-            disabled={starting}
+            disabled={starting || !productSlug}
             aria-label="Ask a question by voice or typing"
           >
             <span className="mic-icon" aria-hidden="true">

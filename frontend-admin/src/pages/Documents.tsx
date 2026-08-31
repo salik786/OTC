@@ -7,6 +7,9 @@ export function Documents() {
   const [products, setProducts] = useState<Product[]>([]);
   const [documents, setDocuments] = useState<DocumentOut[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newSlug, setNewSlug] = useState("");
+  const [newDisplayName, setNewDisplayName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +34,25 @@ export function Documents() {
   }, [credentials]);
 
   async function handleUpload() {
-    if (!credentials || !fileInputRef.current?.files?.[0] || !selectedProduct) return;
+    const targetSlug = addingNew ? newSlug.trim() : selectedProduct;
+    if (!credentials || !fileInputRef.current?.files?.[0] || !targetSlug) return;
+    if (addingNew && !newDisplayName.trim()) return;
     setUploading(true);
     setError(null);
     setMessage(null);
     try {
-      const doc = await api.uploadDocument(credentials, selectedProduct, fileInputRef.current.files[0]);
-      setMessage(`Ingested "${doc.filename}" - ${doc.chunk_count} chunks. This replaced any previous active document for ${selectedProduct}.`);
+      const doc = await api.uploadDocument(
+        credentials,
+        targetSlug,
+        fileInputRef.current.files[0],
+        addingNew ? newDisplayName.trim() : undefined
+      );
+      setMessage(`Ingested "${doc.filename}" - ${doc.chunk_count} chunks. This replaced any previous active document for ${targetSlug}.`);
       fileInputRef.current.value = "";
+      setAddingNew(false);
+      setNewSlug("");
+      setNewDisplayName("");
+      setSelectedProduct(targetSlug);
       await refresh();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Upload failed.");
@@ -90,15 +104,40 @@ export function Documents() {
           vector index is rebuilt automatically.
         </p>
         <div className="form-row">
-          <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)}>
+          <select
+            value={addingNew ? "__new__" : selectedProduct}
+            onChange={(e) => {
+              if (e.target.value === "__new__") {
+                setAddingNew(true);
+              } else {
+                setAddingNew(false);
+                setSelectedProduct(e.target.value);
+              }
+            }}
+          >
             {products.map((p) => (
               <option key={p.id} value={p.slug}>
                 {p.display_name} ({p.slug})
               </option>
             ))}
+            <option value="__new__">+ Add new medicine...</option>
           </select>
+          {addingNew && (
+            <>
+              <input
+                type="text"
+                placeholder="Display name (e.g. Ibuprofen 200mg)"
+                value={newDisplayName}
+                onChange={(e) => {
+                  setNewDisplayName(e.target.value);
+                  setNewSlug(e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
+                }}
+              />
+              <input type="text" placeholder="slug" value={newSlug} onChange={(e) => setNewSlug(e.target.value)} />
+            </>
+          )}
           <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md" />
-          <button onClick={handleUpload} disabled={uploading}>
+          <button onClick={handleUpload} disabled={uploading || (addingNew && (!newSlug || !newDisplayName))}>
             {uploading ? "Ingesting..." : "Upload & Ingest"}
           </button>
         </div>

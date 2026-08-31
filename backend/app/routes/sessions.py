@@ -8,11 +8,26 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.auth import require_admin
-from app.db.models import Product, SessionRecord, Turn
+from app.db.models import Document, Product, SessionRecord, Turn
 from app.db.session import get_db
-from app.schemas import SessionEndRequest, SessionEndResponse, SessionStartRequest, SessionStartResponse
+from app.schemas import ProductOut, SessionEndRequest, SessionEndResponse, SessionStartRequest, SessionStartResponse
 
 router = APIRouter(prefix="/api", tags=["sessions"])
+
+
+@router.get("/products", response_model=list[ProductOut])
+def list_available_products(db: DBSession = Depends(get_db)) -> list[ProductOut]:
+    """Public (no-auth) product list for the participant app's medicine picker - only products
+    with an active ingested document, so a product an admin has created but not yet uploaded a
+    leaflet for never shows up as a selectable option mid-study."""
+    products = (
+        db.query(Product)
+        .join(Document, Document.product_id == Product.id)
+        .filter(Document.active == True)  # noqa: E712
+        .distinct()
+        .all()
+    )
+    return [ProductOut(id=p.id, slug=p.slug, display_name=p.display_name) for p in products]
 
 
 @router.post("/session/start", response_model=SessionStartResponse)

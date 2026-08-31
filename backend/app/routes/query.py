@@ -7,7 +7,7 @@ from app.db.models import Product, SessionRecord, Turn
 from app.db.session import get_db
 from app.rag.generate import generate_answer, generate_core_info
 from app.rag.retrieve import retrieve
-from app.rag.scope_guard import FALLBACK_TEXT, conversational_reply, is_in_scope
+from app.rag.scope_guard import FALLBACK_TEXT
 from app.schemas import CoreInfoResponse, QueryRequest, QueryResponse, RetrievedChunk
 
 router = APIRouter(prefix="/api", tags=["query"])
@@ -32,22 +32,13 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     session = _get_session_or_404(db, req.session_id)
 
     product = db.query(Product).filter(Product.id == session.product_id).first()
+    product_display_name = product.display_name if product else "this medicine"
 
     start = time.perf_counter()
-    small_talk = conversational_reply(req.query_text, product.display_name if product else None)
-    if small_talk is not None:
-        # Greetings/farewells/"can you hear me" checks aren't medical questions - skip
-        # retrieval and scope classification entirely and reply naturally.
-        chunks: list[dict] = []
-        answer_text = small_talk
-        in_scope = True
-    else:
-        chunks = retrieve(db, req.query_text, product_id=session.product_id)
-        in_scope = is_in_scope(req.query_text, chunks)
-        answer_text = generate_answer(req.query_text, chunks) if in_scope else FALLBACK_TEXT
-        # Invariant: the logged in_scope flag always matches whether the fixed deflection text
-        # was actually shown, regardless of what the earlier classifier gates decided.
-        in_scope = answer_text.strip() != FALLBACK_TEXT
+    chunks = retrieve(db, req.query_text, product_id=session.product_id)
+    answer_text = generate_answer(req.query_text, chunks, product_display_name)
+    # The logged in_scope flag reflects whether the fixed deflection text was actually shown.
+    in_scope = answer_text.strip() != FALLBACK_TEXT
     latency_ms = (time.perf_counter() - start) * 1000
 
     turn_number = _next_turn_number(db, session.session_id)

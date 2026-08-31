@@ -14,12 +14,13 @@ settings = get_settings()
 # followed by a colon. Leaflets that don't use recognizable headers fall back to sliding-window
 # chunking - we can't assume every leaflet is structured the same way.
 SECTION_HEADERS = [
-    "uses", "used for", "what is this medicine used for",
-    "dosage", "dose", "directions", "how to take", "how to use",
-    "warnings", "precautions", "do not use if", "when to ask a pharmacist",
-    "storage", "expiry", "how long to use once opened",
+    "uses", "used for", "what is this medicine used for", "purpose", "description",
+    "dosage", "dose", "directions", "how to take", "how to use", "supplement facts", "drug facts",
+    "warnings", "precautions", "do not use if", "when to ask a pharmacist", "ask a doctor",
+    "storage", "expiry", "how long to use once opened", "other information",
     "missed dose", "if you miss a dose",
-    "side effects", "ingredients",
+    "side effects", "ingredients", "active ingredient", "active ingredients", "inactive ingredients",
+    "other ingredients", "questions", "questions or comments",
 ]
 _HEADER_PATTERN = re.compile(
     r"^\s*(" + "|".join(re.escape(h) for h in SECTION_HEADERS) + r")\s*:?\s*$",
@@ -40,6 +41,13 @@ def _structural_chunks(text: str) -> list[dict] | None:
         return None  # not enough structure to trust header-based splitting
 
     chunks = []
+    # Anything before the first recognized header (product name/description, ingredient tables,
+    # intro text) would otherwise be silently discarded - capture it as its own chunk instead of
+    # losing it, since it's often the most important content (what the product actually is).
+    preamble = text[: matches[0].start()].strip()
+    if preamble:
+        chunks.append({"section_label": "Overview", "text": f"Overview: {preamble}"})
+
     for i, m in enumerate(matches):
         label = m.group(1).strip().title()
         start = m.end()
