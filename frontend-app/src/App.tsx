@@ -125,7 +125,11 @@ function App() {
         element={
           <RequireSession session={session}>
             {session && (
-              <VoiceTextChat session={session} onBack={() => navigate("/mode-select")} onEndSession={handleEndSession} />
+              <VoiceTextChat
+                session={session}
+                onBack={() => navigate("/mode-select")}
+                onEndSession={handleEndSession}
+              />
             )}
           </RequireSession>
         }
@@ -136,7 +140,11 @@ function App() {
         element={
           <RequireSession session={session}>
             {session && (
-              <AvatarChat session={session} onBack={() => navigate("/mode-select")} onEndSession={handleEndSession} />
+              <AvatarChat
+                session={session}
+                onBack={() => navigate("/mode-select")}
+                onEndSession={handleEndSession}
+              />
             )}
           </RequireSession>
         }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BackButton } from "../components/BackButton";
+import { TopNav } from "../components/TopNav";
 import { Button } from "../components/Button";
 import { Waveform } from "../components/Waveform";
 import { useConversation } from "../hooks/useConversation";
@@ -64,7 +64,7 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
 
   return (
     <div className="screen chat-screen">
-      <BackButton onClick={onBack} />
+      <TopNav onBack={onBack} />
       <div className="chat-layout">
         <div className="chat-history" ref={listRef} aria-live="polite">
           {conv.history.length === 0 && conv.sttStatus === "idle" && (
@@ -104,7 +104,9 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
           />
           {conv.isSpeaking ? (
             <button className="mic-button-small mic-stop" onClick={handleStop} aria-label="Stop speaking">
-              ⏹
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <rect x="4" y="4" width="12" height="12" rx="2" />
+              </svg>
             </button>
           ) : (
             <button
@@ -113,7 +115,10 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
               disabled={conv.sttStatus === "transcribing"}
               aria-label={conv.sttStatus === "recording" ? "Stop and send" : "Ask by voice"}
             >
-              🎙
+              <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                <rect x="7" y="2.5" width="6" height="10" rx="3" />
+                <path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5M7 17.5h6" strokeLinecap="round" />
+              </svg>
             </button>
           )}
           <Button variant="primary" onClick={handleTypedSubmit} disabled={!typedText.trim() || conv.submitting}>

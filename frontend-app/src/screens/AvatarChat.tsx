@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BackButton } from "../components/BackButton";
+import { TopNav } from "../components/TopNav";
 import { Button } from "../components/Button";
 import { AssistantAvatar } from "../components/AssistantAvatar";
 import { useConversation } from "../hooks/useConversation";
@@ -76,7 +76,7 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
 
   return (
     <div className="screen avatar-screen">
-      <BackButton onClick={onBack} />
+      <TopNav onBack={onBack} />
       <div className="avatar-layout">
         <div className="avatar-main">
           <AssistantAvatar state={avatarState} />
@@ -85,7 +85,9 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
           {conv.isSpeaking ? (
             <div className="avatar-dock">
               <button className="mic-button-compact mic-stop" onClick={handleStop} aria-label="Stop speaking">
-                ⏹
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <rect x="4" y="4" width="12" height="12" rx="2" />
+                </svg>
               </button>
               <span className="muted">Stop</span>
             </div>
@@ -97,7 +99,10 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
                 disabled={conv.sttStatus === "transcribing" || conv.submitting}
                 aria-label={conv.sttStatus === "recording" ? "Stop and send" : "Start talking"}
               >
-                🎙
+                <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                  <rect x="7" y="2.5" width="6" height="10" rx="3" />
+                  <path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5M7 17.5h6" strokeLinecap="round" />
+                </svg>
               </button>
               <button
                 className="link-button"

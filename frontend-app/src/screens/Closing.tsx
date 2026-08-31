@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AppHeader } from "../components/AppHeader";
 
 const CLOSING_TEXT =
   "Thank you for using this system. I hope the information was helpful. The researcher will now ask you a few questions. Goodbye!";
@@ -42,6 +43,7 @@ export function Closing({ onSave, onDone }: Props) {
 
   return (
     <div className="screen closing-screen">
+      <AppHeader light />
       <div className="closing-content">
         <h1>Thank you</h1>
         <p className="lede">{CLOSING_TEXT}</p>

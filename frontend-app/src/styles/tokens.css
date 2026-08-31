@@ -8,11 +8,13 @@
   --color-warning: #9c3b32;
   --color-warning-bg: #fbeceb;
 
-  --color-bg: #faf8f4;
+  --color-bg: #eef7f4;
+  --color-bg-mint: #e3f3ee;
   --color-surface: #ffffff;
   --color-text: #14201e;
   --color-text-muted: #4a5a57;
   --color-border: #d8d3c8;
+  --shadow-card: 0 12px 32px -12px rgba(20, 55, 49, 0.22), 0 2px 8px rgba(20, 55, 49, 0.08);
 
   --color-focus-ring: #b98639;
 
@@ -46,11 +48,20 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: 18px;
   line-height: 1.5;
+
+  /* Soft mint gradient with a faint scatter of medical-icon watermarks - decorative only, kept
+     low-opacity so it never competes with card content for contrast. */
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse 900px 600px at 8% 0%, rgba(46, 105, 96, 0.1), transparent 60%),
+    radial-gradient(ellipse 800px 700px at 100% 100%, rgba(185, 134, 57, 0.08), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Cg fill='none' stroke='%231f4c46' stroke-width='2.5' opacity='0.07'%3E%3Cpath d='M20 40q10-22 20 0t20 0t20 0t20 0' stroke-linecap='round'/%3E%3Ccircle cx='330' cy='55' r='16'/%3E%3Cpath d='M330 39v32M314 55h32' stroke-linecap='round'/%3E%3Crect x='60' y='150' width='54' height='22' rx='11' transform='rotate(45 87 161)'/%3E%3Cline x1='75' y1='150' x2='75' y2='172' transform='rotate(45 87 161)'/%3E%3Cpath d='M250 180c10-14 30-14 30 4c0 14-30 34-30 34s-30-20-30-34c0-18 20-18 30-4z'/%3E%3Cpath d='M40 260c0-16 12-16 12-30M52 230c0-16 12-16 12-30M64 200c0-16 12-16 12-30' stroke-linecap='round'/%3E%3Ccircle cx='340' cy='290' r='16'/%3E%3Cpath d='M330 296l7 7 13-16'/%3E%3Cpath d='M150 330q8-18 16 0t16 0t16 0' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed, fixed, fixed;
+  background-repeat: no-repeat, no-repeat, repeat;
 }
 
 h1,
