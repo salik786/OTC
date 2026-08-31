@@ -27,6 +27,24 @@ def _next_turn_number(db: DBSession, session_id: str) -> int:
     return count + 1
 
 
+_HISTORY_TURNS = 4
+
+
+def _recent_history(db: DBSession, session_id: str) -> list[dict]:
+    """Last few turns (oldest first) so the model can resolve conversational follow-ups like
+    "what do you mean by that" - without this, every turn was answered with zero memory of what
+    was just said, so any reference back to a prior answer looked like an unanswerable non-sequitur
+    and fell through to the fixed deflection."""
+    turns = (
+        db.query(Turn)
+        .filter(Turn.session_id == session_id)
+        .order_by(Turn.turn_number.desc())
+        .limit(_HISTORY_TURNS)
+        .all()
+    )
+    return [{"query": t.query_text, "answer": t.response_text} for t in reversed(turns)]
+
+
 @router.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     session = _get_session_or_404(db, req.session_id)
@@ -35,8 +53,9 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     product_display_name = product.display_name if product else "this medicine"
 
     start = time.perf_counter()
+    history = _recent_history(db, session.session_id)
     chunks = retrieve(db, req.query_text, product_id=session.product_id)
-    answer_text = generate_answer(req.query_text, chunks, product_display_name)
+    answer_text = generate_answer(req.query_text, chunks, product_display_name, history)
     # The logged in_scope flag reflects whether the fixed deflection text was actually shown.
     in_scope = answer_text.strip() != FALLBACK_TEXT
     latency_ms = (time.perf_counter() - start) * 1000
