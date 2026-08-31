@@ -204,12 +204,16 @@ final class UiKit {
         return d;
     }
 
+    /** frontend-app headings use Fraunces (a display serif) via --font-display in tokens.css.
+     * No font file is bundled here, so this uses Android's built-in SERIF font family instead of
+     * the platform default sans-serif - not a pixel match for Fraunces, but a serif silhouette
+     * reads much closer to the web app than the default sans-serif did. */
     static TextView heading(Context ctx, String text) {
         TextView tv = new TextView(ctx);
         tv.setText(text);
         tv.setTextColor(COLOR_TEXT);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
-        tv.setTypeface(null, Typeface.BOLD);
+        tv.setTypeface(Typeface.SERIF, Typeface.BOLD);
         return tv;
     }
 
@@ -302,7 +306,7 @@ final class UiKit {
         TextView wordmark = new TextView(ctx);
         wordmark.setText("MedCheck");
         wordmark.setTextColor(fg);
-        wordmark.setTypeface(null, Typeface.BOLD);
+        wordmark.setTypeface(Typeface.SERIF, Typeface.BOLD);
         wordmark.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 16 : 22);
         row.addView(wordmark);
 
@@ -401,5 +405,70 @@ final class UiKit {
         }
         b.setCompoundDrawables(d, null, null, null);
         b.setCompoundDrawablePadding(dp(ctx, 8));
+    }
+
+    /** The abstract animated orb from frontend-app's AssistantAvatar.tsx (a radial-gradient ball
+     * with small centered dots) - AvatarChatActivity's decorative focal point above the mic dock.
+     * Only the idle "breathing" look is ported (a slow scale pulse); the web version's
+     * listening/speaking/thinking states swap in CSS keyframe animations per state, which isn't
+     * worth the added complexity here since Pepper's physical presence is normally the primary
+     * feedback channel - this is purely for visual parity with the tablet condition on request. */
+    static android.view.View orb(Context ctx) {
+        int size = dp(ctx, 220);
+        android.widget.FrameLayout core = new android.widget.FrameLayout(ctx);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        bg.setGradientRadius(size * 0.75f);
+        bg.setGradientCenter(0.35f, 0.3f);
+        bg.setColors(new int[]{0xFF3A7269, COLOR_PRIMARY, COLOR_PRIMARY_DARK});
+        core.setBackground(bg);
+        core.setElevation(dp(ctx, 8));
+        // Without an explicit oval outline, Android casts the elevation shadow from the view's
+        // rectangular bounds, which reads as a faceted/hexagonal halo around a circular view
+        // instead of a smooth round shadow.
+        core.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(android.view.View view, android.graphics.Outline outline) {
+                outline.setOval(0, 0, view.getWidth(), view.getHeight());
+            }
+        });
+        core.setClipToOutline(false);
+
+        LinearLayout dots = new LinearLayout(ctx);
+        dots.setOrientation(LinearLayout.HORIZONTAL);
+        dots.setGravity(Gravity.CENTER);
+        for (int i = 0; i < 5; i++) {
+            android.view.View dot = new android.view.View(ctx);
+            GradientDrawable dotBg = new GradientDrawable();
+            dotBg.setShape(GradientDrawable.OVAL);
+            dotBg.setColor(0xD9FFFFFF);
+            dot.setBackground(dotBg);
+            int dotSize = dp(ctx, 6);
+            LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dotSize, dotSize);
+            dotLp.leftMargin = dp(ctx, 3);
+            dotLp.rightMargin = dp(ctx, 3);
+            dots.addView(dot, dotLp);
+        }
+        core.addView(dots, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+
+        android.widget.FrameLayout outer = new android.widget.FrameLayout(ctx);
+        outer.addView(core, new android.widget.FrameLayout.LayoutParams(size, size, Gravity.CENTER));
+        outer.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+
+        android.animation.ObjectAnimator breathe = android.animation.ObjectAnimator.ofPropertyValuesHolder(
+                core,
+                android.animation.PropertyValuesHolder.ofFloat(android.view.View.SCALE_X, 1f, 1.04f),
+                android.animation.PropertyValuesHolder.ofFloat(android.view.View.SCALE_Y, 1f, 1.04f));
+        breathe.setDuration(2000);
+        breathe.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+        breathe.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
+        breathe.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        breathe.start();
+
+        return outer;
     }
 }

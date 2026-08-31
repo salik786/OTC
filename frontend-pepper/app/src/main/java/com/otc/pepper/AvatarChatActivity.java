@@ -43,12 +43,15 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
     private TextView statusTv;
     private android.widget.ImageView micBtn;
+    private android.view.View orbView;
+    private LinearLayout dock;
+    private TextView typeInsteadTv;
     private LinearLayout transcriptContainer;
     private TextView transcriptEmptyTv;
     private ScrollView transcriptScroll;
     private LinearLayout typedRow;
     private EditText typedInput;
-    private android.widget.Button stopBtn;
+    private android.widget.ImageView stopBtn;
     private boolean showTyped = false;
     private boolean recording = false;
     private boolean submitting = false;
@@ -155,25 +158,54 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         main.setGravity(Gravity.CENTER);
         main.setPadding(0, UiKit.dp(this, 16), 0, UiKit.dp(this, 16));
 
+        orbView = UiKit.orb(this);
+        main.addView(orbView, wrapWithMargins(0, 0, 0, UiKit.dp(this, 24)));
+
         statusTv = UiKit.body(this, "Tap the microphone to talk to me.");
         UiKit.center(statusTv);
         main.addView(statusTv, wrapWithMargins(0, 0, 0, UiKit.dp(this, 20)));
 
-        micBtn = UiKit.icon(this, R.drawable.ic_mic, 100, 0xFFFFFFFF);
-        micBtn.setPadding(UiKit.dp(this, 26), UiKit.dp(this, 26), UiKit.dp(this, 26), UiKit.dp(this, 26));
+        // Dock: one white pill holding the (small) mic button + "Type instead" link side by side,
+        // matching frontend-app's .avatar-dock - the orb above is the decorative focal point,
+        // this pill is the actual tap target, not a large standalone mic circle.
+        dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable dockBg = new GradientDrawable();
+        dockBg.setColor(UiKit.COLOR_SURFACE);
+        dockBg.setCornerRadius(999f);
+        dock.setBackground(dockBg);
+        dock.setElevation(UiKit.dp(this, 3));
+        dock.setPadding(UiKit.dp(this, 8), UiKit.dp(this, 8), UiKit.dp(this, 20), UiKit.dp(this, 8));
+
+        micBtn = UiKit.icon(this, R.drawable.ic_mic, 52, 0xFFFFFFFF);
+        micBtn.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 14), UiKit.dp(this, 14), UiKit.dp(this, 14));
         micBtn.setBackground(UiKit.circleGradientBg(this));
         micBtn.setOnClickListener(v -> onMicTapped());
-        ((LinearLayout.LayoutParams) micBtn.getLayoutParams()).setMargins(0, 0, 0, UiKit.dp(this, 12));
-        main.addView(micBtn);
+        LinearLayout.LayoutParams micLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        micLp.rightMargin = UiKit.dp(this, 12);
+        dock.addView(micBtn, micLp);
 
-        stopBtn = UiKit.ghostButtonWithIcon(this, R.drawable.ic_stop, "Stop");
+        stopBtn = UiKit.icon(this, R.drawable.ic_stop, 52, 0xFFFFFFFF);
+        stopBtn.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 14), UiKit.dp(this, 14), UiKit.dp(this, 14));
+        stopBtn.setBackground(UiKit.circleGradientBg(this));
         stopBtn.setOnClickListener(v -> handleStop());
         stopBtn.setVisibility(android.view.View.GONE);
-        main.addView(stopBtn, wrapWithMargins(0, 0, 0, UiKit.dp(this, 12)));
+        LinearLayout.LayoutParams stopLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        stopLp.rightMargin = UiKit.dp(this, 12);
+        dock.addView(stopBtn, stopLp);
 
-        android.widget.Button typeInstead = UiKit.ghostButton(this, "Type instead");
-        typeInstead.setOnClickListener(v -> setShowTyped(true));
-        main.addView(typeInstead, wrap());
+        typeInsteadTv = new TextView(this);
+        typeInsteadTv.setText("Type instead");
+        typeInsteadTv.setTextColor(UiKit.COLOR_PRIMARY);
+        typeInsteadTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        typeInsteadTv.setPaintFlags(typeInsteadTv.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+        typeInsteadTv.setOnClickListener(v -> setShowTyped(true));
+        dock.addView(typeInsteadTv, wrap());
+
+        main.addView(dock, wrapWithMargins(0, 0, 0, UiKit.dp(this, 12)));
 
         typedRow = new LinearLayout(this);
         typedRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -273,6 +305,8 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
         stopBtn.setVisibility(speaking ? android.view.View.VISIBLE : android.view.View.GONE);
         micBtn.setVisibility(!speaking && !showTyped ? android.view.View.VISIBLE : android.view.View.GONE);
+        typeInsteadTv.setVisibility(!speaking && !showTyped ? android.view.View.VISIBLE : android.view.View.GONE);
+        dock.setVisibility(showTyped ? android.view.View.GONE : android.view.View.VISIBLE);
     }
 
     // ---- Actions ----

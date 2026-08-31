@@ -94,8 +94,8 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
         card.setOnClickListener(onClick);
         UiKit.addCardRipple(this, card);
 
-        android.widget.ImageView iconView = UiKit.icon(this, iconRes, 40, UiKit.COLOR_PRIMARY);
-        ((LinearLayout.LayoutParams) iconView.getLayoutParams()).setMargins(0, 0, 0, UiKit.dp(this, 4));
+        android.widget.ImageView iconView = UiKit.iconBadge(this, iconRes, 56, UiKit.COLOR_BG_MINT, UiKit.COLOR_PRIMARY);
+        ((LinearLayout.LayoutParams) iconView.getLayoutParams()).setMargins(0, 0, 0, UiKit.dp(this, 8));
         card.addView(iconView);
 
         TextView titleTv = UiKit.body(this, title);
