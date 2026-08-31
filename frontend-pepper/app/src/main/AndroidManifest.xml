@@ -19,7 +19,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".WelcomeActivity" android:exported="false" />
         <activity android:name=".CoreInfoActivity" android:exported="false" />
         <activity android:name=".ModeSelectActivity" android:exported="false" />
         <activity android:name=".ChatActivity" android:exported="false" />

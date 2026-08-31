@@ -58,6 +58,16 @@ public final class ApiClient {
 
     // ---- Data models (mirrors backend/app/schemas.py) ----
 
+    public static class Product {
+        public final String slug;
+        public final String displayName;
+
+        Product(JSONObject o) throws Exception {
+            slug = o.getString("slug");
+            displayName = o.getString("display_name");
+        }
+    }
+
     public static class SessionStartResponse {
         public final String sessionId;
         public final String participantId;
@@ -107,6 +117,29 @@ public final class ApiClient {
     }
 
     // ---- Calls ----
+
+    /** Public (no-auth) medicine list - only products with an active ingested document, matching
+     * frontend-app's ResearcherSetup screen (see backend/app/routes/sessions.py:list_available_products).
+     * Fetched fresh on every launch instead of hardcoded, so a medicine an admin adds via the
+     * admin panel shows up on Pepper the same way it does on the tablet, with no app update. */
+    public static void listProducts(ApiCallback<List<Product>> cb) {
+        run(() -> {
+            Request request = new Request.Builder()
+                    .url(BuildConfig.API_BASE_URL + "/api/products")
+                    .get()
+                    .build();
+            try (Response response = CLIENT.newCall(request).execute()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    throw new Exception("HTTP " + response.code() + ": " + responseBody);
+                }
+                JSONArray arr = new JSONArray(responseBody);
+                List<Product> products = new ArrayList<>();
+                for (int i = 0; i < arr.length(); i++) products.add(new Product(arr.getJSONObject(i)));
+                return products;
+            }
+        }, cb);
+    }
 
     /** platform is always "pepper" - a value the backend's Platform literal already supports. */
     public static void startSession(String productSlug, ApiCallback<SessionStartResponse> cb) {

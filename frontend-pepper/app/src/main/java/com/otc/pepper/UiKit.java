@@ -8,46 +8,71 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 
 /**
  * Small shared styling helpers so every screen looks consistent without repeating drawable/button
- * boilerplate in each Activity. Colors are copied from frontend-app/src/styles/tokens.css so the
- * Pepper app reads as the same product, not a re-skin.
+ * boilerplate in each Activity. Colors/theme match frontend-app's "MedCheck" rebrand (see
+ * frontend-app/src/styles/tokens.css and app.css) so the Pepper app reads as the same product for
+ * the study's condition comparison, not a re-skin - mint gradient background, teal gradient pill
+ * buttons, rounded gradient cards with a soft shadow.
  */
 final class UiKit {
     private UiKit() {}
 
     static final int COLOR_PRIMARY = 0xFF1F4C46;
+    static final int COLOR_PRIMARY_LIGHT = 0xFF2E6960;
     static final int COLOR_PRIMARY_DARK = 0xFF163731;
     static final int COLOR_ACCENT = 0xFFB98639;
+    static final int COLOR_ACCENT_DARK = 0xFF93692B;
     static final int COLOR_WARNING = 0xFF9C3B32;
     static final int COLOR_WARNING_BG = 0xFFFBECEB;
-    static final int COLOR_BG = 0xFFFAF8F4;
+    static final int COLOR_MAX_DOSE_BG = 0xFFFDF3E6;
+    static final int COLOR_BG = 0xFFEEF7F4;
+    static final int COLOR_BG_MINT = 0xFFE3F3EE;
     static final int COLOR_SURFACE = 0xFFFFFFFF;
     static final int COLOR_TEXT = 0xFF14201E;
     static final int COLOR_TEXT_MUTED = 0xFF4A5A57;
     static final int COLOR_BORDER = 0xFFD8D3C8;
+    static final int COLOR_ON_PRIMARY = 0xFFFFFFFF;
 
     static int dp(Context ctx, int value) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, ctx.getResources().getDisplayMetrics());
     }
 
+    /** The app's mint gradient background - apply to every screen's root view so the whole app
+     * reads as one consistent "MedCheck" surface instead of a flat cream fill. */
+    static Drawable screenBackground() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFE9F5F1, COLOR_BG, 0xFFEFF6F1});
+        return d;
+    }
+
     static Button primaryButton(Context ctx, String text) {
         Button b = baseButton(ctx, text);
         b.setTextColor(0xFFFFFFFF);
-        b.setBackground(withRipple(pill(COLOR_PRIMARY, 0, 0), 0x33FFFFFF));
+        b.setBackground(withRipple(primaryGradientPill(), 0x33FFFFFF));
+        b.setElevation(dp(ctx, 4));
         return b;
+    }
+
+    private static GradientDrawable primaryGradientPill() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{COLOR_PRIMARY_LIGHT, COLOR_PRIMARY, COLOR_PRIMARY_DARK});
+        d.setCornerRadius(999f);
+        return d;
     }
 
     static Button secondaryButton(Context ctx, String text) {
         Button b = baseButton(ctx, text);
         b.setTextColor(COLOR_PRIMARY);
-        b.setBackground(withRipple(pill(COLOR_SURFACE, dp(ctx, 2), COLOR_PRIMARY), 0x221F4C46));
+        b.setBackground(withRipple(pill(COLOR_SURFACE, dp(ctx, 2), COLOR_PRIMARY_LIGHT), 0x221F4C46));
         return b;
     }
 
@@ -68,6 +93,15 @@ final class UiKit {
     static Drawable circleBg(Context ctx, int fillColor) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(fillColor);
+        d.setCornerRadius(999f);
+        return withRipple(d, 0x33FFFFFF);
+    }
+
+    /** Teal gradient circular button background (mic buttons), matching the web app's
+     * mic-button-small gradient instead of a flat fill. */
+    static Drawable circleGradientBg(Context ctx) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{COLOR_PRIMARY_LIGHT, COLOR_PRIMARY});
         d.setCornerRadius(999f);
         return withRipple(d, 0x33FFFFFF);
     }
@@ -135,13 +169,106 @@ final class UiKit {
     static android.widget.LinearLayout card(Context ctx) {
         android.widget.LinearLayout card = new android.widget.LinearLayout(ctx);
         card.setOrientation(android.widget.LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(COLOR_SURFACE);
-        bg.setCornerRadius(dp(ctx, 16));
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{COLOR_SURFACE, COLOR_BG_MINT});
+        bg.setCornerRadius(dp(ctx, 28));
         card.setBackground(bg);
         card.setPadding(dp(ctx, 24), dp(ctx, 24), dp(ctx, 24), dp(ctx, 24));
-        card.setElevation(dp(ctx, 3));
+        card.setElevation(dp(ctx, 6));
         return card;
+    }
+
+    /** Small colored pill-shaped icon badge (e.g. next to "Medicine on the counter", or leading a
+     * structured info row on the core-info screen) - matches the web app's `.field-icon` /
+     * `.info-row-icon` mint circle treatment. */
+    static ImageView iconBadge(Context ctx, int drawableRes, int sizeDp, int badgeColor, int tintColor) {
+        ImageView iv = icon(ctx, drawableRes, sizeDp / 2, tintColor);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(badgeColor);
+        bg.setCornerRadius(999f);
+        iv.setBackground(bg);
+        int size = dp(ctx, sizeDp);
+        iv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(size, size));
+        iv.setPadding(size / 4, size / 4, size / 4, size / 4);
+        return iv;
+    }
+
+    static android.widget.LinearLayout brandHeader(Context ctx, boolean compact) {
+        return brandHeader(ctx, compact, false);
+    }
+
+    /** The shared "MedCheck" brand header - heart+cross mark drawn directly (no bitmap asset) plus
+     * the wordmark, rendered identically to frontend-app's AppHeader component so both study
+     * conditions show the same brand identity. Pass compact=true for mid-flow screens (smaller,
+     * no tagline) vs the full version on the merged welcome screen. Pass light=true on a solid
+     * dark-teal background (e.g. ClosingActivity) - the default teal-on-light treatment would be
+     * invisible there, matching frontend-app's AppHeader `light` prop. */
+    static android.widget.LinearLayout brandHeader(Context ctx, boolean compact, boolean light) {
+        int fg = light ? 0xFFFFFFFF : COLOR_PRIMARY;
+
+        android.widget.LinearLayout col = new android.widget.LinearLayout(ctx);
+        col.setOrientation(android.widget.LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView logo = icon(ctx, R.drawable.ic_heart_cross, compact ? 22 : 32, fg);
+        android.widget.LinearLayout.LayoutParams logoLp =
+                (android.widget.LinearLayout.LayoutParams) logo.getLayoutParams();
+        logoLp.rightMargin = dp(ctx, 8);
+        row.addView(logo);
+
+        TextView wordmark = new TextView(ctx);
+        wordmark.setText("MedCheck");
+        wordmark.setTextColor(fg);
+        wordmark.setTypeface(null, Typeface.BOLD);
+        wordmark.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 16 : 22);
+        row.addView(wordmark);
+
+        col.addView(row);
+
+        if (!compact) {
+            TextView tagline = new TextView(ctx);
+            tagline.setText("Smarter Medicine Decisions");
+            tagline.setTextColor(light ? 0xBFFFFFFF : COLOR_TEXT_MUTED);
+            tagline.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            tagline.setTypeface(null, Typeface.BOLD);
+            center(tagline);
+            col.addView(tagline);
+        }
+
+        return col;
+    }
+
+    /** Back button + compact brand header in a real row, matching frontend-app's TopNav component
+     * - the header centers only in the space left over after the back button, so it can never
+     * visually collide with it regardless of screen width (a real bug found and fixed on the
+     * tablet side; ported here for the same reason). Use at the top of every mid-flow screen. */
+    static LinearLayout topNav(Context ctx, View.OnClickListener onBack) {
+        LinearLayout row = new LinearLayout(ctx);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button back = ghostButtonWithIcon(ctx, R.drawable.ic_back, "Back");
+        back.setOnClickListener(onBack);
+        GradientDrawable backBg = new GradientDrawable();
+        backBg.setColor(COLOR_SURFACE);
+        backBg.setCornerRadius(999f);
+        backBg.setStroke(1, 0x1F1F4C46);
+        back.setBackground(withRipple(backBg, 0x1A1F4C46));
+        back.setTextColor(COLOR_PRIMARY);
+        setLeadingIcon(ctx, back, R.drawable.ic_back, COLOR_PRIMARY);
+        row.addView(back, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout headerWrap = new LinearLayout(ctx);
+        headerWrap.setGravity(Gravity.CENTER);
+        headerWrap.addView(brandHeader(ctx, true));
+        row.addView(headerWrap, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        return row;
     }
 
     /** Adds ripple touch feedback to a clickable card, matching its rounded corners. Call after

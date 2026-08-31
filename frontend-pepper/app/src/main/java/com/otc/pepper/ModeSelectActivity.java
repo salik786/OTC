@@ -53,9 +53,14 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
     private LinearLayout buildRoot() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setGravity(Gravity.CENTER);
-        col.setBackgroundColor(UiKit.COLOR_BG);
-        col.setPadding(UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40));
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        col.setBackground(UiKit.screenBackground());
+        col.setPadding(UiKit.dp(this, 24), UiKit.dp(this, 16), UiKit.dp(this, 24), UiKit.dp(this, 24));
+
+        LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        topNavLp.bottomMargin = UiKit.dp(this, 24);
+        col.addView(UiKit.topNav(this, v -> finish()), topNavLp);
 
         TextView title = UiKit.heading(this, "How would you like to ask?");
         UiKit.center(title);
@@ -77,10 +82,6 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
                 cardParams());
 
         col.addView(row, wrap());
-
-        android.widget.Button back = UiKit.ghostButtonWithIcon(this, R.drawable.ic_back, "Back");
-        back.setOnClickListener(v -> finish());
-        col.addView(back, wrapWithMargins(0, UiKit.dp(this, 24), 0, 0));
 
         return col;
     }

@@ -48,9 +48,13 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     private ScrollView transcriptScroll;
     private LinearLayout typedRow;
     private EditText typedInput;
+    private android.widget.Button stopBtn;
     private boolean showTyped = false;
     private boolean recording = false;
     private boolean submitting = false;
+    private boolean speaking = false;
+    /** Hands-free voice loop, matching frontend-app's voiceModeActiveRef pattern - see ChatActivity. */
+    private boolean voiceModeActive = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,8 +84,14 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             }
 
             @Override
-            public void onSpeakingStateChanged(boolean speaking) {
-                runOnUiThread(AvatarChatActivity.this::updateStatus);
+            public void onSpeakingStateChanged(boolean isSpeaking) {
+                runOnUiThread(() -> {
+                    speaking = isSpeaking;
+                    updateStatus();
+                    if (!isSpeaking && voiceModeActive && !recording && !submitting && !showTyped) {
+                        startListening();
+                    }
+                });
             }
         });
 
@@ -92,6 +102,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
     @Override
     protected void onDestroy() {
+        voiceModeActive = false;
         if (speechRecognizer != null) {
             speechRecognizer.destroy();
             speechRecognizer = null;
@@ -131,12 +142,13 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     private LinearLayout buildRoot() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(UiKit.COLOR_BG);
+        root.setBackground(UiKit.screenBackground());
         root.setPadding(UiKit.dp(this, 24), UiKit.dp(this, 16), UiKit.dp(this, 24), UiKit.dp(this, 16));
 
-        android.widget.Button back = UiKit.ghostButtonWithIcon(this, R.drawable.ic_back, "Back");
-        back.setOnClickListener(v -> finish());
-        root.addView(back, wrap());
+        LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        topNavLp.bottomMargin = UiKit.dp(this, 8);
+        root.addView(UiKit.topNav(this, v -> finish()), topNavLp);
 
         LinearLayout main = new LinearLayout(this);
         main.setOrientation(LinearLayout.VERTICAL);
@@ -149,10 +161,15 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
         micBtn = UiKit.icon(this, R.drawable.ic_mic, 100, 0xFFFFFFFF);
         micBtn.setPadding(UiKit.dp(this, 26), UiKit.dp(this, 26), UiKit.dp(this, 26), UiKit.dp(this, 26));
-        micBtn.setBackground(circleBg(UiKit.COLOR_PRIMARY));
+        micBtn.setBackground(UiKit.circleGradientBg(this));
         micBtn.setOnClickListener(v -> onMicTapped());
         ((LinearLayout.LayoutParams) micBtn.getLayoutParams()).setMargins(0, 0, 0, UiKit.dp(this, 12));
         main.addView(micBtn);
+
+        stopBtn = UiKit.ghostButtonWithIcon(this, R.drawable.ic_stop, "Stop");
+        stopBtn.setOnClickListener(v -> handleStop());
+        stopBtn.setVisibility(android.view.View.GONE);
+        main.addView(stopBtn, wrapWithMargins(0, 0, 0, UiKit.dp(this, 12)));
 
         android.widget.Button typeInstead = UiKit.ghostButton(this, "Type instead");
         typeInstead.setOnClickListener(v -> setShowTyped(true));
@@ -205,8 +222,14 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
     private void setShowTyped(boolean show) {
         showTyped = show;
+        if (show) voiceModeActive = false; // typing opts back out of the hands-free voice loop
         typedRow.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
-        micBtn.setVisibility(show ? android.view.View.GONE : android.view.View.VISIBLE);
+        updateStatus();
+    }
+
+    private void handleStop() {
+        voiceModeActive = false;
+        conversation.stopSpeaking();
     }
 
     private android.graphics.drawable.Drawable circleBg(int color) {
@@ -222,7 +245,17 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         q.setTypeface(null, android.graphics.Typeface.BOLD);
         transcriptContainer.addView(q, wrapWithMargins(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 2)));
 
-        TextView a = UiKit.muted(this, turn.answerText);
+        // Deflected answers get the same warning-tinted treatment as ChatActivity's transcript,
+        // instead of rendering identically to an in-scope answer with no visual distinction.
+        TextView a = turn.inScope ? UiKit.muted(this, turn.answerText) : UiKit.body(this, turn.answerText);
+        if (!turn.inScope) {
+            a.setTextColor(UiKit.COLOR_WARNING);
+            GradientDrawable deflectedBg = new GradientDrawable();
+            deflectedBg.setColor(UiKit.COLOR_WARNING_BG);
+            deflectedBg.setCornerRadius(UiKit.dp(this, 10));
+            a.setBackground(deflectedBg);
+            a.setPadding(UiKit.dp(this, 10), UiKit.dp(this, 8), UiKit.dp(this, 10), UiKit.dp(this, 8));
+        }
         transcriptContainer.addView(a, wrap());
 
         transcriptScroll.post(() -> transcriptScroll.fullScroll(android.view.View.FOCUS_DOWN));
@@ -230,12 +263,16 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
     private void updateStatus() {
         String text;
-        if (recording) text = "Listening...";
+        if (speaking) text = "Speaking...";
+        else if (recording) text = "Listening...";
         else if (submitting) text = "Thinking...";
         else text = "Tap the microphone to talk to me.";
         statusTv.setText(text);
         micBtn.setAlpha(submitting ? 0.5f : 1f);
         micBtn.setEnabled(!submitting);
+
+        stopBtn.setVisibility(speaking ? android.view.View.VISIBLE : android.view.View.GONE);
+        micBtn.setVisibility(!speaking && !showTyped ? android.view.View.VISIBLE : android.view.View.GONE);
     }
 
     // ---- Actions ----
@@ -243,12 +280,14 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     private void handleTypedSubmit() {
         String text = typedInput.getText().toString();
         if (text.trim().isEmpty() || submitting) return;
+        voiceModeActive = false;
         typedInput.setText("");
         conversation.submit(text, "typed");
     }
 
     private void onMicTapped() {
         if (recording || submitting) return;
+        voiceModeActive = true;
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.RECORD_AUDIO}, REQ_MIC);
             return;
@@ -270,7 +309,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         } catch (Exception e) {
             Log.e(TAG, "startListening: " + e.getMessage(), e);
             recording = false;
-            micBtn.setBackground(circleBg(UiKit.COLOR_PRIMARY));
+            micBtn.setBackground(UiKit.circleGradientBg(this));
         }
     }
 
@@ -290,7 +329,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             public void onResults(Bundle results) {
                 ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 recording = false;
-                micBtn.setBackground(circleBg(UiKit.COLOR_PRIMARY));
+                micBtn.setBackground(UiKit.circleGradientBg(AvatarChatActivity.this));
                 if (matches != null && !matches.isEmpty() && !matches.get(0).trim().isEmpty()) {
                     conversation.submit(matches.get(0), "voice");
                 } else {
@@ -303,7 +342,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             public void onError(int error) {
                 Log.w(TAG, "Speech error: " + error);
                 recording = false;
-                micBtn.setBackground(circleBg(UiKit.COLOR_PRIMARY));
+                micBtn.setBackground(UiKit.circleGradientBg(AvatarChatActivity.this));
                 if (error != SpeechRecognizer.ERROR_CLIENT) {
                     statusTv.setText("Microphone access was denied or is unavailable. Please type your question instead.");
                 }
@@ -321,6 +360,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     }
 
     private void endSession() {
+        voiceModeActive = false;
         conversation.stopSpeaking();
         ApiClient.endSession(sessionId, new ApiClient.ApiCallback<Void>() {
             @Override public void onSuccess(Void result) { goToClosing(); }

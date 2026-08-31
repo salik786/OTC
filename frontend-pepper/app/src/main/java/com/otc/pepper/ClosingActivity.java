@@ -1,6 +1,9 @@
 package com.otc.pepper;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.widget.LinearLayout;
@@ -15,10 +18,13 @@ import com.aldebaran.qi.sdk.design.activity.RobotActivity;
 import com.aldebaran.qi.sdk.object.conversation.Say;
 
 /**
- * Native port of frontend-app/src/screens/Closing.tsx. Kiosk sessions must be a dead end - the web
- * version traps the browser back button with history.pushState; the Android equivalent is
- * overriding onBackPressed() to swallow the back press outright, regardless of what activities are
- * still on the stack behind this one.
+ * Native port of frontend-app/src/screens/Closing.tsx. Kiosk sessions must be a dead end for the
+ * ~4s it displays - the web version traps the browser back button with history.pushState; the
+ * Android equivalent is overriding onBackPressed() to swallow the back press. After that window,
+ * it auto-resets to the setup screen for the next participant (matching the tablet's
+ * handleResetToStart), clearing the whole back stack so there's no way to navigate back into the
+ * ended session - previously this was a genuine dead end with no way back to a fresh session
+ * short of force-closing the app.
  */
 public class ClosingActivity extends RobotActivity implements RobotLifecycleCallbacks {
 
@@ -26,20 +32,25 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
     private static final String CLOSING_TEXT =
             "Thank you for using this system. I hope the information was helpful. The researcher " +
             "will now ask you a few questions. Goodbye!";
+    private static final long RESET_DELAY_MS = 4000;
 
     private QiContext qiContext;
     private Future<Void> sayFuture;
     private boolean spoken = false;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable resetRunnable = this::resetToStart;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildRoot());
         QiSDK.register(this, this);
+        handler.postDelayed(resetRunnable, RESET_DELAY_MS);
     }
 
     @Override
     protected void onDestroy() {
+        handler.removeCallbacks(resetRunnable);
         QiSDK.unregister(this, this);
         super.onDestroy();
     }
@@ -75,22 +86,36 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
         Log.e(TAG, "Robot focus refused: " + reason);
     }
 
+    private void resetToStart() {
+        Intent intent = new Intent(this, ResearcherSetupActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
     private LinearLayout buildRoot() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER);
-        col.setBackgroundColor(UiKit.COLOR_BG);
+        col.setBackgroundColor(UiKit.COLOR_PRIMARY);
         col.setPadding(UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40));
 
+        col.addView(UiKit.brandHeader(this, false, true), wrapWithMaxWidth(0, UiKit.dp(this, 24)));
+
         TextView title = UiKit.heading(this, "Thank you");
+        title.setTextColor(0xFFFFFFFF);
         UiKit.center(title);
         col.addView(title, wrap());
 
         TextView lede = UiKit.body(this, CLOSING_TEXT);
+        lede.setTextColor(0xFFFFFFFF);
         UiKit.center(lede);
         col.addView(lede, wrapWithMaxWidth(UiKit.dp(this, 16), UiKit.dp(this, 8)));
 
-        TextView muted = UiKit.muted(this, "This session has ended.");
+        TextView muted = new TextView(this);
+        muted.setText("This session has ended.");
+        muted.setTextColor(0xB3FFFFFF);
+        muted.setTextSize(14);
         UiKit.center(muted);
         col.addView(muted, wrap());
 

@@ -1,9 +1,11 @@
 package com.otc.pepper;
 
 import android.content.Intent;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -18,7 +20,8 @@ import com.aldebaran.qi.sdk.object.conversation.Say;
 
 /**
  * Native port of frontend-app/src/screens/CoreInfo.tsx. Fetches /api/core-info on load, renders
- * the structured leaflet summary, and speaks full_text via QiSDK Say once robot focus is ready.
+ * the structured leaflet summary as icon-labeled cards (matching the tablet's redesign), and
+ * speaks full_text via QiSDK Say once robot focus is ready.
  */
 public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCallbacks {
 
@@ -67,17 +70,26 @@ public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCal
 
     private ScrollView buildRoot() {
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(UiKit.COLOR_BG);
+        scroll.setBackground(UiKit.screenBackground());
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 16), UiKit.dp(this, 16), UiKit.dp(this, 16));
+        LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        topNavLp.bottomMargin = UiKit.dp(this, 16);
+        root.addView(UiKit.topNav(this, v -> finish()), topNavLp);
 
         contentContainer = new LinearLayout(this);
         contentContainer.setOrientation(LinearLayout.VERTICAL);
         contentContainer.setGravity(Gravity.CENTER_HORIZONTAL);
-        contentContainer.setPadding(UiKit.dp(this, 32), UiKit.dp(this, 40), UiKit.dp(this, 32), UiKit.dp(this, 32));
 
         TextView loading = UiKit.muted(this, "Loading information about " + productDisplayName + "...");
         contentContainer.addView(loading, wrap());
 
-        scroll.addView(contentContainer, new ScrollView.LayoutParams(
+        root.addView(contentContainer, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        scroll.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         return scroll;
     }
@@ -125,22 +137,66 @@ public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCal
         LinearLayout card = UiKit.card(this);
         card.setOrientation(LinearLayout.VERTICAL);
 
-        card.addView(UiKit.heading(this, data.productName), wrapWithMargins(0, 0, 0, UiKit.dp(this, 16)));
+        LinearLayout headingRow = new LinearLayout(this);
+        headingRow.setOrientation(LinearLayout.HORIZONTAL);
+        headingRow.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView pillIcon = UiKit.iconBadge(this, R.drawable.ic_capsule, 48, UiKit.COLOR_BG_MINT, UiKit.COLOR_PRIMARY);
+        LinearLayout.LayoutParams pillIconLp = (LinearLayout.LayoutParams) pillIcon.getLayoutParams();
+        pillIconLp.rightMargin = UiKit.dp(this, 12);
+        headingRow.addView(pillIcon);
+        headingRow.addView(UiKit.heading(this, data.productName), wrap());
+        card.addView(headingRow, wrapWithMargins(0, 0, 0, UiKit.dp(this, 16)));
 
-        addRow(card, "Used for", data.usedFor);
-        addRow(card, "Dose", data.dose);
-        addRow(card, "Frequency", data.frequency);
-        addRow(card, "Max in 24 hours", data.maxDose24h);
+        addRow(card, R.drawable.ic_target, "Used for", data.usedFor, UiKit.COLOR_BG_MINT);
+        addRow(card, R.drawable.ic_dose, "Dose", data.dose, UiKit.COLOR_BG_MINT);
+        addRow(card, R.drawable.ic_clock, "Frequency", data.frequency, UiKit.COLOR_BG_MINT);
+        addRow(card, R.drawable.ic_warning, "Max in 24 hours", data.maxDose24h, UiKit.COLOR_MAX_DOSE_BG);
 
         if (!data.warnings.isEmpty()) {
-            card.addView(UiKit.label(this, "WARNINGS"), wrapWithMargins(0, UiKit.dp(this, 12), 0, UiKit.dp(this, 6)));
+            LinearLayout warnBlock = new LinearLayout(this);
+            warnBlock.setOrientation(LinearLayout.VERTICAL);
+            GradientDrawable warnBg = new GradientDrawable();
+            warnBg.setColor(UiKit.COLOR_WARNING_BG);
+            warnBlock.setBackground(warnBg);
+            warnBlock.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 12), UiKit.dp(this, 12), UiKit.dp(this, 12));
+
+            LinearLayout warnHeading = new LinearLayout(this);
+            warnHeading.setOrientation(LinearLayout.HORIZONTAL);
+            warnHeading.setGravity(Gravity.CENTER_VERTICAL);
+            ImageView warnIcon = UiKit.icon(this, R.drawable.ic_warning, 18, UiKit.COLOR_WARNING);
+            LinearLayout.LayoutParams warnIconLp = (LinearLayout.LayoutParams) warnIcon.getLayoutParams();
+            warnIconLp.rightMargin = UiKit.dp(this, 6);
+            warnHeading.addView(warnIcon);
+            TextView warnTitle = new TextView(this);
+            warnTitle.setText("Warnings");
+            warnTitle.setTextColor(UiKit.COLOR_WARNING);
+            warnTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            warnHeading.addView(warnTitle);
+            warnBlock.addView(warnHeading, wrapWithMargins(0, 0, 0, UiKit.dp(this, 6)));
+
             for (String w : data.warnings) {
-                card.addView(UiKit.body(this, "•  " + w), wrapWithMargins(0, 0, 0, UiKit.dp(this, 6)));
+                warnBlock.addView(UiKit.body(this, "•  " + w), wrapWithMargins(0, 0, 0, UiKit.dp(this, 4)));
             }
+            card.addView(warnBlock, wrapWithMargins(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 8)));
         }
 
+        LinearLayout footerNote = new LinearLayout(this);
+        footerNote.setOrientation(LinearLayout.HORIZONTAL);
+        GradientDrawable footerBg = new GradientDrawable();
+        footerBg.setColor(UiKit.COLOR_BG_MINT);
+        footerBg.setCornerRadius(UiKit.dp(this, 12));
+        footerNote.setBackground(footerBg);
+        footerNote.setPadding(UiKit.dp(this, 10), UiKit.dp(this, 10), UiKit.dp(this, 10), UiKit.dp(this, 10));
+        ImageView footerIcon = UiKit.icon(this, R.drawable.ic_info, 14, UiKit.COLOR_PRIMARY);
+        LinearLayout.LayoutParams footerIconLp = (LinearLayout.LayoutParams) footerIcon.getLayoutParams();
+        footerIconLp.rightMargin = UiKit.dp(this, 8);
+        footerNote.addView(footerIcon);
+        TextView footerText = UiKit.muted(this, "Always read the label and follow the instructions on the packaging.");
+        footerNote.addView(footerText, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        card.addView(footerNote, wrapWithMargins(0, UiKit.dp(this, 4), 0, UiKit.dp(this, 12)));
+
         TextView prompt = UiKit.body(this, "Do you have any questions?");
-        card.addView(prompt, wrapWithMargins(0, UiKit.dp(this, 20), 0, UiKit.dp(this, 12)));
+        card.addView(prompt, wrapWithMargins(0, 0, 0, UiKit.dp(this, 12)));
 
         android.widget.Button askBtn = UiKit.primaryButton(this, "Ask a question");
         askBtn.setOnClickListener(v -> {
@@ -156,10 +212,29 @@ public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCal
                 UiKit.dp(this, 560), LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
-    private void addRow(LinearLayout parent, String labelText, String value) {
+    private void addRow(LinearLayout parent, int iconRes, String labelText, String value, int badgeColor) {
         if (value == null || value.isEmpty()) return;
-        parent.addView(UiKit.label(this, labelText.toUpperCase()), wrapWithMargins(0, UiKit.dp(this, 10), 0, UiKit.dp(this, 2)));
-        parent.addView(UiKit.body(this, value), wrap());
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        GradientDrawable rowBg = new GradientDrawable();
+        rowBg.setColor(badgeColor);
+        rowBg.setCornerRadius(UiKit.dp(this, 12));
+        row.setBackground(rowBg);
+        row.setPadding(UiKit.dp(this, 10), UiKit.dp(this, 10), UiKit.dp(this, 10), UiKit.dp(this, 10));
+
+        ImageView icon = UiKit.icon(this, iconRes, 18, UiKit.COLOR_PRIMARY);
+        LinearLayout.LayoutParams iconLp = (LinearLayout.LayoutParams) icon.getLayoutParams();
+        iconLp.rightMargin = UiKit.dp(this, 10);
+        iconLp.topMargin = UiKit.dp(this, 2);
+        row.addView(icon);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.addView(UiKit.label(this, labelText.toUpperCase()), wrap());
+        body.addView(UiKit.body(this, value), wrap());
+        row.addView(body, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        parent.addView(row, wrapWithMargins(0, 0, 0, UiKit.dp(this, 8)));
     }
 
     private LinearLayout.LayoutParams wrap() {
@@ -167,7 +242,8 @@ public class CoreInfoActivity extends RobotActivity implements RobotLifecycleCal
     }
 
     private LinearLayout.LayoutParams wrapWithMargins(int l, int t, int r, int b) {
-        LinearLayout.LayoutParams lp = wrap();
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(l, t, r, b);
         return lp;
     }
