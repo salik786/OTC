@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ResearcherSetup } from "./screens/ResearcherSetup";
-import { Welcome } from "./screens/Welcome";
 import { ModeSelect } from "./screens/ModeSelect";
 import { VoiceTextChat } from "./screens/VoiceTextChat";
 import { AvatarChat } from "./screens/AvatarChat";
@@ -56,30 +55,39 @@ function App() {
 
   useBackNavigationTrap(ended);
 
-  async function handleStart(productSlug: string) {
+  async function handleTellMe(productSlug: string) {
+    setEnded(false); // fresh session - re-arm the end-of-session guard for this participant
     setStarting(true);
     const started = await startSession(productSlug);
     setStarting(false);
-    if (started) navigate("/welcome");
+    if (started) navigate("/core-info");
   }
 
-  async function handleEndSession() {
-    if (ended) return; // kiosk dead-end guard: never re-enter the session once closed
+  async function handleAskQuestion(productSlug: string) {
+    setEnded(false);
+    setStarting(true);
+    const started = await startSession(productSlug);
+    setStarting(false);
+    if (started) navigate("/mode-select");
+  }
+
+  function handleEndSession() {
+    if (ended) return; // guard: don't re-trigger while already closing
     setEnded(true);
-    await endSession();
-    navigate("/closing");
+    navigate("/closing"); // navigate immediately - Closing shows its own "saving" state
+  }
+
+  function handleResetToStart() {
+    setEnded(false);
+    navigate("/");
   }
 
   return (
     <Routes>
-      <Route path="/" element={<ResearcherSetup onStart={handleStart} starting={starting} error={sessionError} />} />
-
       <Route
-        path="/welcome"
+        path="/"
         element={
-          <RequireSession session={session}>
-            <Welcome onTellMe={() => navigate("/core-info")} onAskQuestion={() => navigate("/mode-select")} />
-          </RequireSession>
+          <ResearcherSetup onTellMe={handleTellMe} onAskQuestion={handleAskQuestion} starting={starting} error={sessionError} />
         }
       />
 
@@ -91,7 +99,7 @@ function App() {
               <CoreInfo
                 sessionId={session.session_id}
                 productDisplayName={session.product_display_name}
-                onBack={() => navigate("/welcome")}
+                onBack={() => navigate("/")}
                 onAskQuestion={() => navigate("/mode-select")}
               />
             )}
@@ -104,7 +112,7 @@ function App() {
         element={
           <RequireSession session={session}>
             <ModeSelect
-              onBack={() => navigate("/welcome")}
+              onBack={() => navigate("/")}
               onChooseChat={() => navigate("/chat")}
               onChooseAvatar={() => navigate("/avatar")}
             />
@@ -138,7 +146,7 @@ function App() {
         path="/closing"
         element={
           <RequireSession session={session}>
-            <Closing onSessionEnd={() => {}} />
+            <Closing onSave={endSession} onDone={handleResetToStart} />
           </RequireSession>
         }
       />

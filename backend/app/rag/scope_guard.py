@@ -81,7 +81,12 @@ def llm_classify_in_scope(query_text: str) -> bool:
 
 
 _CHECKIN_RE = re.compile(r"\b(can you hear me|are you (there|listening)|anyone (there|listening))\b", re.IGNORECASE)
-_GREETING_RE = re.compile(r"^\s*(hi|hello|hey|good (morning|afternoon|evening))[\s!.?]*$", re.IGNORECASE)
+# Unanchored (not whole-utterance) because these phrases never legitimately appear inside a real
+# medical question, unlike "hi"/"hello" alone which must stay strictly anchored below - otherwise
+# "hi, what's the max dose" would get hijacked into a pure greeting reply and the real question
+# would silently go unanswered.
+_HOW_ARE_YOU_RE = re.compile(r"\bhow(’|'| i)?s? (are )?you( doing| going)?\b|\bhow'?s it going\b|\bwhat'?s up\b", re.IGNORECASE)
+_GREETING_RE = re.compile(r"^\s*(hi|hello|hey|good (morning|afternoon|evening))[\s,!.?]*$", re.IGNORECASE)
 _FAREWELL_RE = re.compile(
     r"^\s*(bye( bye)?|goodbye|good bye|see you( later)?|that'?s all([, ]*thanks)?|i'?m done)[\s!.?]*$", re.IGNORECASE
 )
@@ -89,6 +94,7 @@ _THANKS_RE = re.compile(r"^\s*(thanks?( you)?( so much)?|ok(ay)?|great|cool|alri
 
 _CONVERSATIONAL_REPLIES: list[tuple[re.Pattern, str]] = [
     (_CHECKIN_RE, "Yes, I can hear you. Please go ahead and ask your question about this medicine."),
+    (_HOW_ARE_YOU_RE, "I'm doing well, thank you for asking! How can I help you with this medicine?"),
     (_GREETING_RE, "Hello! I'm here to help you understand this medicine. What would you like to know?"),
     (_FAREWELL_RE, "Goodbye! Take care, and don't hesitate to ask if you have more questions."),
     (_THANKS_RE, "You're welcome! Let me know if you have any other questions about this medicine."),

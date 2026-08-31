@@ -12,18 +12,38 @@ interface Props {
 }
 
 /** Voice + text chat: one persistent screen where the transcript is always visible while the
- * participant talks or types - no separate full-screen "listening" takeover. */
+ * participant talks or types - no separate full-screen "listening" takeover. Once voice is
+ * started, it's hands-free (like GPT voice mode): each answer auto-resumes listening until the
+ * participant types instead, taps Stop, or ends the session. */
 export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
   const conv = useConversation(session);
   const [typedText, setTypedText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const voiceModeActiveRef = useRef(false);
+  const wasSpeakingRef = useRef(false);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [conv.history.length, conv.sttStatus]);
 
+  useEffect(() => {
+    const justStoppedSpeaking = wasSpeakingRef.current && !conv.isSpeaking;
+    wasSpeakingRef.current = conv.isSpeaking;
+    if (justStoppedSpeaking && voiceModeActiveRef.current && conv.sttStatus === "idle") {
+      conv.startVoice();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.isSpeaking]);
+
+  useEffect(() => {
+    return () => {
+      voiceModeActiveRef.current = false;
+    };
+  }, []);
+
   function handleTypedSubmit() {
     if (!typedText.trim() || conv.submitting) return;
+    voiceModeActiveRef.current = false; // typing opts back out of the hands-free voice loop
     conv.submitText(typedText.trim(), "typed");
     setTypedText("");
   }
@@ -32,8 +52,14 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
     if (conv.sttStatus === "recording") {
       await conv.stopVoiceAndSubmit();
     } else if (conv.sttStatus === "idle") {
+      voiceModeActiveRef.current = true;
       conv.startVoice();
     }
+  }
+
+  function handleStop() {
+    voiceModeActiveRef.current = false;
+    conv.stopSpeaking();
   }
 
   return (
@@ -77,7 +103,7 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
             aria-label="Type your question"
           />
           {conv.isSpeaking ? (
-            <button className="mic-button-small mic-stop" onClick={conv.stopSpeaking} aria-label="Stop speaking">
+            <button className="mic-button-small mic-stop" onClick={handleStop} aria-label="Stop speaking">
               ⏹
             </button>
           ) : (

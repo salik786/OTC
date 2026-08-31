@@ -115,35 +115,28 @@
   width: 100%;
 }
 
-.badge {
-  display: inline-block;
-  background: var(--color-accent);
-  color: white;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
+.product-select-label {
+  display: block;
+  font-weight: 600;
+  margin-top: var(--space-2);
+  margin-bottom: 0.4rem;
+}
+
+.product-select {
+  width: 100%;
+  min-height: var(--tap-target-min);
+  font-size: 1.1rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  background: white;
   margin-bottom: var(--space-2);
 }
 
-.researcher-card fieldset {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
-  margin: var(--space-3) 0;
-}
-
-.radio-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--tap-target-min);
-  font-size: 1.1rem;
-}
-
-.radio-row input {
-  width: 24px;
-  height: 24px;
+.disclaimer-small {
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: var(--space-3);
 }
 
 /* ---------- Welcome ---------- */

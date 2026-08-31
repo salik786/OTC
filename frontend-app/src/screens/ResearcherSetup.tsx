@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../components/Button";
 
 const PRODUCTS = [
   { slug: "paracetamol", label: "Paracetamol" },
@@ -6,42 +7,60 @@ const PRODUCTS = [
 ];
 
 interface Props {
-  onStart: (productSlug: string) => void;
+  onTellMe: (productSlug: string) => void;
+  onAskQuestion: (productSlug: string) => void;
   starting: boolean;
   error: string | null;
 }
 
-export function ResearcherSetup({ onStart, starting, error }: Props) {
+export function ResearcherSetup({ onTellMe, onAskQuestion, starting, error }: Props) {
   const [productSlug, setProductSlug] = useState(PRODUCTS[0].slug);
 
   return (
     <div className="screen researcher-screen">
       <div className="researcher-card">
-        <span className="badge">Researcher setup - not participant facing</span>
-        <h2>Start a session</h2>
-        <p className="muted">
-          Place the matching medicine box on the counter before starting. The participant will only see
-          information about the product selected here.
+        <h1>Hello!</h1>
+        <p className="lede">
+          I'm here to help you understand this medicine - what it's used for, how to take it, and any important
+          warnings from the packaging.
         </p>
-        <fieldset>
-          <legend>Medicine on the counter</legend>
+
+        <label className="product-select-label" htmlFor="product-select">
+          Medicine on the counter
+        </label>
+        <select
+          id="product-select"
+          className="product-select"
+          value={productSlug}
+          onChange={(e) => setProductSlug(e.target.value)}
+        >
           {PRODUCTS.map((p) => (
-            <label key={p.slug} className="radio-row">
-              <input
-                type="radio"
-                name="product"
-                value={p.slug}
-                checked={productSlug === p.slug}
-                onChange={() => setProductSlug(p.slug)}
-              />
+            <option key={p.slug} value={p.slug}>
               {p.label}
-            </label>
+            </option>
           ))}
-        </fieldset>
+        </select>
+
         {error && <p className="error-text">{error}</p>}
-        <button className="btn btn-primary" onClick={() => onStart(productSlug)} disabled={starting}>
-          {starting ? "Starting..." : "Start Session"}
-        </button>
+
+        <div className="welcome-actions">
+          <Button variant="primary" onClick={() => onTellMe(productSlug)} disabled={starting}>
+            {starting ? "Starting..." : "Tell me about this medicine"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => onAskQuestion(productSlug)}
+            disabled={starting}
+            aria-label="Ask a question by voice or typing"
+          >
+            <span className="mic-icon" aria-hidden="true">
+              🎙
+            </span>
+            Ask a question
+          </Button>
+        </div>
+
+        <p className="muted disclaimer-small">I'm not a pharmacist and can't give personal health advice.</p>
       </div>
     </div>
   );
