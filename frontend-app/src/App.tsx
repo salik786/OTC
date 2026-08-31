@@ -91,6 +91,7 @@ function App() {
               <CoreInfo
                 sessionId={session.session_id}
                 productDisplayName={session.product_display_name}
+                onBack={() => navigate("/welcome")}
                 onAskQuestion={() => navigate("/mode-select")}
               />
             )}

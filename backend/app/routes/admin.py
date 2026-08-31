@@ -6,11 +6,11 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session as DBSession
 
 from app.auth import require_admin
-from app.db.models import Document, Product, SessionRecord
+from app.db.models import Chunk, Document, Product, SessionRecord
 from app.db.session import get_db
 from app.rag.ingest import delete_document, ingest_document
 from app.rag.retrieve import retrieve
-from app.schemas import DocumentOut, ProductOut, RetrievedChunk, SessionSummaryOut, TestRetrievalRequest, TestRetrievalResponse
+from app.schemas import DocumentChunkOut, DocumentOut, ProductOut, RetrievedChunk, SessionSummaryOut, TestRetrievalRequest, TestRetrievalResponse
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 limiter = Limiter(key_func=get_remote_address)
@@ -51,6 +51,18 @@ def list_documents(db: DBSession = Depends(get_db)) -> list[DocumentOut]:
             filename=d.filename, uploaded_at=d.uploaded_at, chunk_count=d.chunk_count, active=d.active,
         ))
     return out
+
+
+@router.get("/documents/{document_id}/chunks", response_model=list[DocumentChunkOut])
+def get_document_chunks(document_id: str, db: DBSession = Depends(get_db)) -> list[DocumentChunkOut]:
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if document is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    chunks = db.query(Chunk).filter(Chunk.document_id == document_id).order_by(Chunk.chunk_index).all()
+    return [
+        DocumentChunkOut(chunk_id=c.id, chunk_index=c.chunk_index, section_label=c.section_label, text=c.text)
+        for c in chunks
+    ]
 
 
 @router.delete("/documents/{document_id}")

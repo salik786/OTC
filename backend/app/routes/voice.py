@@ -21,9 +21,10 @@ def _openai() -> OpenAI:
 
 @router.post("/stt", response_model=STTResponse)
 async def speech_to_text(audio: UploadFile) -> STTResponse:
-    """Proxies audio to Whisper. Kept server-side (not called from the browser directly) so the
-    same endpoint can be reused by a future native Android client without duplicating STT logic
-    or embedding API keys client-side."""
+    """Proxies audio to OpenAI's transcription API (gpt-4o-mini-transcribe by default - faster
+    than whisper-1 for short kiosk utterances). Kept server-side (not called from the browser
+    directly) so the same endpoint can be reused by a future native Android client without
+    duplicating STT logic or embedding API keys client-side."""
     audio_bytes = await audio.read()
     file_tuple = (audio.filename or "audio.webm", audio_bytes, audio.content_type or "audio/webm")
     transcript = _openai().audio.transcriptions.create(model=settings.openai_stt_model, file=file_tuple)

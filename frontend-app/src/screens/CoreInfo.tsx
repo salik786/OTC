@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BackButton } from "../components/BackButton";
 import { Button } from "../components/Button";
 import { useTTS } from "../hooks/useTTS";
 import { api, type CoreInfoResponse } from "../lib/api";
@@ -6,10 +7,11 @@ import { api, type CoreInfoResponse } from "../lib/api";
 interface Props {
   sessionId: string;
   productDisplayName: string;
+  onBack: () => void;
   onAskQuestion: () => void;
 }
 
-export function CoreInfo({ sessionId, productDisplayName, onAskQuestion }: Props) {
+export function CoreInfo({ sessionId, productDisplayName, onBack, onAskQuestion }: Props) {
   const [data, setData] = useState<CoreInfoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { speak } = useTTS();
@@ -31,6 +33,7 @@ export function CoreInfo({ sessionId, productDisplayName, onAskQuestion }: Props
   if (error) {
     return (
       <div className="screen core-info-screen">
+        <BackButton onClick={onBack} />
         <p className="error-text">{error}</p>
       </div>
     );
@@ -39,6 +42,7 @@ export function CoreInfo({ sessionId, productDisplayName, onAskQuestion }: Props
   if (!data) {
     return (
       <div className="screen core-info-screen">
+        <BackButton onClick={onBack} />
         <p className="muted" aria-live="polite">
           Loading information about {productDisplayName}...
         </p>
@@ -48,6 +52,7 @@ export function CoreInfo({ sessionId, productDisplayName, onAskQuestion }: Props
 
   return (
     <div className="screen core-info-screen">
+      <BackButton onClick={onBack} />
       <div className="info-card">
         <h2>{data.product_name}</h2>
 

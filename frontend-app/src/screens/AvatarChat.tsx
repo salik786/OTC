@@ -19,9 +19,30 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
   const [typedText, setTypedText] = useState("");
   const transcriptRef = useRef<HTMLDivElement>(null);
 
+  // Once the participant taps the mic the first time, the conversation goes hands-free: after
+  // each answer finishes speaking, listening resumes automatically (like GPT voice mode) instead
+  // of requiring another tap. Turned off by switching to typed input, or ending/leaving the screen.
+  const voiceModeActiveRef = useRef(false);
+  const wasSpeakingRef = useRef(false);
+
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
   }, [conv.history.length]);
+
+  useEffect(() => {
+    const justStoppedSpeaking = wasSpeakingRef.current && !conv.isSpeaking;
+    wasSpeakingRef.current = conv.isSpeaking;
+    if (justStoppedSpeaking && voiceModeActiveRef.current && conv.sttStatus === "idle" && !showTyped) {
+      conv.startVoice();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.isSpeaking]);
+
+  useEffect(() => {
+    return () => {
+      voiceModeActiveRef.current = false;
+    };
+  }, []);
 
   const avatarState =
     conv.sttStatus === "recording" ? "listening" : conv.submitting ? "thinking" : conv.isSpeaking ? "speaking" : "idle";
@@ -30,6 +51,7 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
     if (conv.sttStatus === "recording") {
       await conv.stopVoiceAndSubmit();
     } else if (conv.sttStatus === "idle") {
+      voiceModeActiveRef.current = true;
       conv.startVoice();
     }
   }
@@ -64,7 +86,14 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
               >
                 🎙
               </button>
-              <button className="link-button" onClick={() => setShowTyped(true)}>
+              <button
+                className="link-button"
+                onClick={() => {
+                  voiceModeActiveRef.current = false;
+                  conv.cancelVoice();
+                  setShowTyped(true);
+                }}
+              >
                 Type instead
               </button>
             </div>

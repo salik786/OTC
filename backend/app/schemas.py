@@ -102,6 +102,13 @@ class DocumentOut(BaseModel):
     active: bool
 
 
+class DocumentChunkOut(BaseModel):
+    chunk_id: str
+    chunk_index: int
+    section_label: str | None
+    text: str
+
+
 class TestRetrievalRequest(BaseModel):
     query: str
     product_slug: str

@@ -41,6 +41,13 @@ export interface DocumentOut {
   active: boolean;
 }
 
+export interface DocumentChunk {
+  chunk_id: string;
+  chunk_index: number;
+  section_label: string | null;
+  text: string;
+}
+
 export interface RetrievedChunk {
   chunk_id: string;
   text: string;
@@ -77,6 +84,11 @@ export const api = {
       body: form,
     }).then((r) => handle<DocumentOut>(r));
   },
+
+  getDocumentChunks: (credentials: string, documentId: string) =>
+    fetch(`${API_BASE}/api/admin/documents/${documentId}/chunks`, { headers: authHeader(credentials) }).then((r) =>
+      handle<DocumentChunk[]>(r)
+    ),
 
   deleteDocument: (credentials: string, documentId: string) =>
     fetch(`${API_BASE}/api/admin/documents/${documentId}`, {

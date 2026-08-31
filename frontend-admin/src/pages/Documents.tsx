@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
-import { api, ApiError, type DocumentOut, type Product } from "../lib/api";
+import { api, ApiError, type DocumentChunk, type DocumentOut, type Product } from "../lib/api";
 
 export function Documents() {
   const { credentials } = useAuth();
@@ -11,6 +11,11 @@ export function Documents() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [viewingDoc, setViewingDoc] = useState<DocumentOut | null>(null);
+  const [viewingChunks, setViewingChunks] = useState<DocumentChunk[] | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
 
   async function refresh() {
     if (!credentials) return;
@@ -51,6 +56,28 @@ export function Documents() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Delete failed.");
     }
+  }
+
+  async function handleView(doc: DocumentOut) {
+    if (!credentials) return;
+    setViewingDoc(doc);
+    setViewingChunks(null);
+    setViewError(null);
+    setViewLoading(true);
+    try {
+      const chunks = await api.getDocumentChunks(credentials, doc.id);
+      setViewingChunks(chunks);
+    } catch (e) {
+      setViewError(e instanceof ApiError ? e.message : "Could not load document content.");
+    } finally {
+      setViewLoading(false);
+    }
+  }
+
+  function closeView() {
+    setViewingDoc(null);
+    setViewingChunks(null);
+    setViewError(null);
   }
 
   return (
@@ -101,6 +128,7 @@ export function Documents() {
                 <td>{d.chunk_count}</td>
                 <td>{d.active ? "yes" : "no"}</td>
                 <td>
+                  <button onClick={() => handleView(d)}>View</button>{" "}
                   <button className="danger" onClick={() => handleDelete(d)}>
                     Delete
                   </button>
@@ -117,6 +145,39 @@ export function Documents() {
           </tbody>
         </table>
       </div>
+
+      {viewingDoc && (
+        <div className="modal-backdrop" onClick={closeView}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                {viewingDoc.filename} <span className="muted">({viewingDoc.product_slug})</span>
+              </h3>
+              <button className="link-button" onClick={closeView}>
+                Close
+              </button>
+            </div>
+            <p className="muted">
+              This is exactly what was extracted and chunked from this file - what the RAG pipeline actually
+              retrieves from, not the raw upload.
+            </p>
+            {viewLoading && <p className="muted">Loading...</p>}
+            {viewError && <p className="error">{viewError}</p>}
+            {viewingChunks &&
+              viewingChunks.map((c) => (
+                <div key={c.chunk_id} className="chunk-card">
+                  <div className="chunk-header">
+                    <strong>
+                      #{c.chunk_index} {c.section_label ?? "Unlabeled chunk"}
+                    </strong>
+                  </div>
+                  <p>{c.text}</p>
+                </div>
+              ))}
+            {viewingChunks && viewingChunks.length === 0 && <p className="muted">No chunks stored for this document.</p>}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

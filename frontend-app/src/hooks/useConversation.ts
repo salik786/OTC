@@ -41,12 +41,14 @@ export function useConversation(session: SessionStartResponse | null) {
     [session, tts]
   );
 
-  const startVoice = useCallback(() => stt.start(), [stt]);
-
   const stopVoiceAndSubmit = useCallback(async () => {
     const transcript = await stt.stop();
     if (transcript && transcript.trim()) await submitText(transcript, "voice");
   }, [stt, submitText]);
+
+  // Auto-stops itself on sustained silence (see useSTT) and submits whatever was captured -
+  // no second tap needed to end the participant's turn.
+  const startVoice = useCallback(() => stt.start(() => stopVoiceAndSubmit()), [stt, stopVoiceAndSubmit]);
 
   return {
     history,

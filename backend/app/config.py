@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_generation_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-large"
-    openai_stt_model: str = "whisper-1"
+    openai_stt_model: str = "gpt-4o-mini-transcribe"
     openai_tts_model: str = "tts-1"
     openai_tts_voice: str = "alloy"
 
