@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime as _SADateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 
 def _uuid() -> str:
@@ -11,6 +13,27 @@ def _uuid() -> str:
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class DateTime(TypeDecorator):
+    """Drop-in replacement for sqlalchemy.DateTime(timezone=True) that survives SQLite. SQLite
+    has no native timezone-aware storage - even with timezone=True, it silently drops tzinfo on
+    write and hands back a naive datetime on read, even though every value we write is UTC (see
+    _utcnow()). A naive datetime serializes to JSON with no "Z"/offset suffix, and browsers parse
+    a timezone-less ISO string as LOCAL time rather than UTC - so every timestamp shown in the
+    admin panel was off by the viewer's UTC offset. Re-attaching UTC on the way out of the DB
+    fixes it at the source for every consumer (API responses, CSV export) at once, instead of
+    patching each place a timestamp gets formatted downstream. Postgres (which does preserve
+    tzinfo) passes through unaffected by process_result_value's "if naive" check.
+    """
+
+    impl = _SADateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class Base(DeclarativeBase):
