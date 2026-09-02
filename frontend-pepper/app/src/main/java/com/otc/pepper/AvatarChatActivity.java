@@ -260,7 +260,17 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         ScrollView mainScroll = new ScrollView(this);
         mainScroll.addView(main, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        root.addView(mainScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // mainScroll takes WRAP_CONTENT (its full natural height) first, and transcriptScroll -
+        // weighted below - only gets whatever's left over. On a screen short enough that
+        // mainScroll's natural content (the orb, status text, dock, end-session button) already
+        // exceeds the whole screen, that leftover is zero: the transcript becomes reachable in
+        // principle (transcriptScroll is still a real ScrollView) but has no visible height to
+        // scroll from, i.e. effectively invisible. Giving mainScroll a weight too, alongside
+        // transcriptScroll's, means both share the available space proportionally instead of one
+        // unconditionally starving the other - each still scrolls internally if its own share
+        // isn't enough for its content. Weighted 3:1 since mainScroll's content (built around a
+        // 220dp orb) is inherently taller than a reasonable minimum for a few lines of transcript.
+        root.addView(mainScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 3f));
 
         transcriptScroll = new ScrollView(this);
         transcriptContainer = new LinearLayout(this);

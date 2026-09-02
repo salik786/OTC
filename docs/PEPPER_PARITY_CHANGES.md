@@ -56,12 +56,34 @@ itself. All four fixed in `UiKit.java`, `AvatarChatActivity.java`, `ModeSelectAc
    reach it" problem as #2** - its root was also a plain, non-scrolling `LinearLayout`. Fixed the
    same way, wrapping it in a `ScrollView` (matching the pattern already used on
    `ResearcherSetupActivity`).
+6. **Found while re-testing fix #2 with real content: the transcript panel on
+   `AvatarChatActivity` could end up with zero visible height on a short screen**, even though it's
+   a real `ScrollView`. Root cause: after fix #2 wrapped the orb/status/dock section (`mainScroll`)
+   in its own `ScrollView`, that section still took `WRAP_CONTENT` (its full natural height)
+   unconditionally, while the transcript panel below it was `weight=1` - meaning the transcript
+   only ever got *whatever mainScroll didn't use*, which is zero once mainScroll's own content
+   alone exceeds the screen. Fixed by giving `mainScroll` a weight too (3, vs. the transcript's 1)
+   so both share the available space proportionally and both scroll internally within their own
+   allotted share, instead of one unconditionally starving the other.
+
+Re-tested at the same 800x480 resolution after the fix: a real question submitted from
+`AvatarChatActivity`'s typed-input mode round-trips correctly and the transcript panel's
+empty-state text ("Your conversation will appear here.") is now genuinely visible, confirming it
+has real allotted space. Didn't get a clean screenshot of an actual answer bubble rendered in that
+space before the emulator itself became too input-laggy to reliably continue (unrelated to the
+app - this device had been running a long test session) - not re-verified visually, but
+`addTranscriptTurn()` itself wasn't touched by any of these fixes and is the same method already
+confirmed working with real content on `ChatActivity`'s equivalent transcript.
 
 Not yet chased down: a reported "Chat UI is not properly visible" issue on `ChatActivity`
-specifically - re-tested at the same 800x480 resolution used to reproduce the above and the screen
-looked correctly laid out (header, empty-state text, input bar, mic/Ask buttons, end-session link
-all visible and reachable). Needs an actual screenshot of the specific problem to chase further;
-may simply have been a consequence of one of the above bugs rather than a separate one.
+specifically - re-tested at the same 800x480 resolution used to reproduce the above (including a
+full real Q&A round trip: typed a question, submitted, got a real answer back, bubbles rendered
+with fully readable text) and nothing looked broken. The closest thing found was that after
+sending a message, the *top* of the just-submitted question bubble can scroll mostly out of view
+if the conversation is taller than the screen - normal scroll-to-bottom behavior for a chat view,
+same as any messaging app, not obviously a bug. Needs an actual screenshot of the specific problem
+to chase further; may simply have been a consequence of one of the above bugs rather than a
+separate one.
 
 ## Already shared automatically (backend changes - nothing to port)
 
