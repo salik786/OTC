@@ -14,16 +14,37 @@ export function ResearcherSetup({ onTellMe, onAskQuestion, starting, error }: Pr
   const [products, setProducts] = useState<Product[]>([]);
   const [productSlug, setProductSlug] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
+  // A single fetch failure here used to strand the screen permanently, requiring a full page
+  // reload - too easy to hit from a brief backend hiccup (e.g. a deploy restarting the server)
+  // and too technical an ask for a study participant. Retry a couple of times with backoff
+  // before giving up, and let the "Try again" link below re-run this effect on demand.
   useEffect(() => {
-    api
-      .listProducts()
-      .then((prods) => {
-        setProducts(prods);
-        if (prods.length > 0) setProductSlug(prods[0].slug);
-      })
-      .catch(() => setLoadError("Could not load the medicine list. Check the connection and reload."));
-  }, []);
+    let cancelled = false;
+    const attempt = (n: number) => {
+      api
+        .listProducts()
+        .then((prods) => {
+          if (cancelled) return;
+          setLoadError(null);
+          setProducts(prods);
+          if (prods.length > 0) setProductSlug(prods[0].slug);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (n < 2) {
+            setTimeout(() => attempt(n + 1), 1000 * (n + 1));
+          } else {
+            setLoadError("Could not load the medicine list. Check the connection and try again.");
+          }
+        });
+    };
+    attempt(0);
+    return () => {
+      cancelled = true;
+    };
+  }, [retryCount]);
 
   return (
     <div className="screen researcher-screen">
@@ -58,7 +79,14 @@ export function ResearcherSetup({ onTellMe, onAskQuestion, starting, error }: Pr
           ))}
         </select>
 
-        {loadError && <p className="error-text">{loadError}</p>}
+        {loadError && (
+          <p className="error-text">
+            {loadError}{" "}
+            <button type="button" className="link-button" onClick={() => setRetryCount((c) => c + 1)}>
+              Try again
+            </button>
+          </p>
+        )}
         {!loadError && products.length === 0 && (
           <p className="error-text">No medicines are set up yet. Ask a researcher to upload one in the admin panel.</p>
         )}
