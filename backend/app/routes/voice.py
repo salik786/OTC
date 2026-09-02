@@ -1,5 +1,3 @@
-import io
-
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
@@ -33,13 +31,20 @@ async def speech_to_text(audio: UploadFile) -> STTResponse:
 
 @router.post("/tts")
 def text_to_speech(req: TTSRequest) -> StreamingResponse:
-    """Proxies text to OpenAI TTS and streams back audio. Same rationale as /stt: keeps voice
-    generation platform-agnostic and server-controlled rather than relying on inconsistent
-    browser-native speech synthesis."""
-    response = _openai().audio.speech.create(
-        model=settings.openai_tts_model,
-        voice=settings.openai_tts_voice,
-        input=req.text,
-    )
-    audio_bytes = response.read()
-    return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/mpeg")
+    """Proxies text to OpenAI TTS and relays audio chunks as OpenAI sends them. Previously this
+    called response.read() first, which fully buffers the entire clip in memory before this
+    endpoint sends a single byte to the browser - despite the docstring already claiming to
+    stream, it was fully serial (OpenAI generates the whole clip -> we finish downloading it ->
+    only then does the browser start receiving anything). Genuinely relaying chunks as they
+    arrive lets that download overlap with OpenAI's own generation instead of happening
+    strictly after it."""
+    def relay():
+        with _openai().audio.speech.with_streaming_response.create(
+            model=settings.openai_tts_model,
+            voice=settings.openai_tts_voice,
+            input=req.text,
+        ) as response:
+            for chunk in response.iter_bytes(chunk_size=4096):
+                yield chunk
+
+    return StreamingResponse(relay(), media_type="audio/mpeg")

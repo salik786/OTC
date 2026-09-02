@@ -34,6 +34,13 @@ export interface QueryResponse {
   turn_number: number;
 }
 
+export interface QueryStreamDone {
+  turn_number: number;
+  in_scope: boolean;
+  latency_ms: number;
+  answer_text: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -87,6 +94,48 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId, query_text: queryText, input_method: inputMethod }),
     }).then((r) => handle<QueryResponse>(r)),
+
+  /** Reads /api/query/stream as newline-delimited JSON, calling onDelta for each text chunk as
+   * the model generates it and onDone once with the final metadata (turn number, in_scope,
+   * latency, full answer text) - lets the caller start speaking the first sentence before the
+   * model has finished writing the rest of the answer. */
+  queryStream: async (
+    sessionId: string,
+    queryText: string,
+    inputMethod: InputMethod,
+    onDelta: (text: string) => void,
+    onDone: (meta: QueryStreamDone) => void
+  ): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/query/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, query_text: queryText, input_method: inputMethod }),
+    });
+    if (!res.ok || !res.body) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || res.statusText);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let done: QueryStreamDone | null = null;
+    while (true) {
+      const { value, done: readerDone } = await reader.read();
+      if (readerDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (!line) continue;
+        const event = JSON.parse(line) as { delta?: string } & Partial<QueryStreamDone> & { done?: true };
+        if (event.delta) onDelta(event.delta);
+        else if (event.done) done = event as unknown as QueryStreamDone;
+      }
+    }
+    if (!done) throw new Error("Stream ended without a final result");
+    onDone(done);
+  },
 
   stt: async (audioBlob: Blob): Promise<string> => {
     const form = new FormData();

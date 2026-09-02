@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     openai_generation_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-large"
     openai_stt_model: str = "gpt-4o-mini-transcribe"
-    openai_tts_model: str = "tts-1"
+    # Benchmarked against tts-1 with a real answer-length string: ~26% faster full-generation
+    # time (3.17s vs 4.30s avg) and ~30% faster time-to-first-byte (1.40s vs 2.02s) - a real,
+    # not marginal, difference for a kiosk voice conversation.
+    openai_tts_model: str = "gpt-4o-mini-tts"
     openai_tts_voice: str = "alloy"
 
     admin_username: str = "admin"

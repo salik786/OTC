@@ -3,6 +3,7 @@ import { TopNav } from "../components/TopNav";
 import { Button } from "../components/Button";
 import { Waveform } from "../components/Waveform";
 import { useConversation } from "../hooks/useConversation";
+import { useLoadingMessage } from "../hooks/useLoadingMessage";
 import type { SessionStartResponse } from "../lib/api";
 
 interface Props {
@@ -17,14 +18,21 @@ interface Props {
  * participant types instead, taps Stop, or ends the session. */
 export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
   const conv = useConversation(session);
+  const loadingMessage = useLoadingMessage(conv.submitting);
   const [typedText, setTypedText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const voiceModeActiveRef = useRef(false);
   const wasSpeakingRef = useRef(false);
 
+  // Answers now stream in - the same turn's answerText grows in place rather than history
+  // gaining a new entry per word, so scrolling only on history.length changing meant the view
+  // stayed pinned wherever it was while the answer kept extending past the visible area. Total
+  // answer character count across history changes on every streamed chunk, which keeps this
+  // effect (and the scroll it does) firing as the text grows, not just once per turn.
+  const totalAnswerChars = conv.history.reduce((sum, t) => sum + t.answerText.length, 0);
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [conv.history.length, conv.sttStatus]);
+  }, [conv.history.length, totalAnswerChars, conv.sttStatus]);
 
   useEffect(() => {
     const justStoppedSpeaking = wasSpeakingRef.current && !conv.isSpeaking;
@@ -70,8 +78,8 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
           {conv.history.length === 0 && conv.sttStatus === "idle" && (
             <p className="muted qa-empty">Ask anything about this medicine - by voice or by typing below.</p>
           )}
-          {conv.history.map((turn) => (
-            <div key={turn.turnNumber} className="qa-turn">
+          {conv.history.map((turn, i) => (
+            <div key={i} className="qa-turn">
               <div className="qa-bubble qa-bubble-participant">{turn.queryText}</div>
               <div className={`qa-bubble qa-bubble-system ${turn.inScope ? "" : "qa-bubble-deflected"}`}>
                 {!turn.inScope && <span className="deflect-tag">Outside what I can help with</span>}
@@ -87,7 +95,7 @@ export function VoiceTextChat({ session, onBack, onEndSession }: Props) {
           )}
           {conv.submitting && (
             <div className="qa-turn">
-              <div className="qa-bubble qa-bubble-system qa-bubble-loading">Thinking...</div>
+              <div className="qa-bubble qa-bubble-system qa-bubble-loading">{loadingMessage}</div>
             </div>
           )}
           {conv.sttError && <p className="error-text">{conv.sttError}</p>}

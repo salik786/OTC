@@ -3,6 +3,7 @@ import { TopNav } from "../components/TopNav";
 import { Button } from "../components/Button";
 import { AssistantAvatar } from "../components/AssistantAvatar";
 import { useConversation } from "../hooks/useConversation";
+import { useLoadingMessage } from "../hooks/useLoadingMessage";
 import type { SessionStartResponse } from "../lib/api";
 
 interface Props {
@@ -25,9 +26,15 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
   const voiceModeActiveRef = useRef(false);
   const wasSpeakingRef = useRef(false);
 
+  // Answers now stream in - the same turn's answerText grows in place rather than history
+  // gaining a new entry per word, so scrolling only on history.length changing meant the view
+  // stayed pinned wherever it was while the answer kept extending past the visible area. Total
+  // answer character count across history changes on every streamed chunk, which keeps this
+  // effect (and the scroll it does) firing as the text grows, not just once per turn.
+  const totalAnswerChars = conv.history.reduce((sum, t) => sum + t.answerText.length, 0);
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
-  }, [conv.history.length]);
+  }, [conv.history.length, totalAnswerChars]);
 
   useEffect(() => {
     const justStoppedSpeaking = wasSpeakingRef.current && !conv.isSpeaking;
@@ -62,10 +69,11 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
     setTypedText("");
   }
 
+  const loadingMessage = useLoadingMessage(conv.submitting);
   let statusText = "Tap the microphone to talk to me.";
   if (conv.sttStatus === "recording") statusText = "Listening...";
   else if (conv.sttStatus === "transcribing") statusText = "Got it - one moment...";
-  else if (conv.submitting) statusText = "Thinking...";
+  else if (conv.submitting) statusText = loadingMessage;
   else if (conv.isSpeaking) statusText = "Speaking...";
   else if (conv.sttError) statusText = conv.sttError;
 
@@ -144,9 +152,9 @@ export function AvatarChat({ session, onBack, onEndSession }: Props) {
           {conv.history.length === 0 && (
             <p className="muted avatar-transcript-empty">Your conversation will appear here.</p>
           )}
-          {conv.history.map((turn) => (
+          {conv.history.map((turn, i) => (
             <div
-              key={turn.turnNumber}
+              key={i}
               className={`avatar-transcript-turn ${!turn.inScope ? "avatar-transcript-deflected" : ""}`}
             >
               <div className="avatar-transcript-bubble avatar-transcript-question">{turn.queryText}</div>

@@ -948,14 +948,21 @@
 .orb-listening .orb-bar-4 { animation-delay: 0.3s; }
 .orb-listening .orb-bar-5 { animation-delay: 0.4s; }
 
-/* thinking: core gently rotates/shimmers, bars settled */
+/* thinking: a real dual-tone spinner ring (the universally-recognized "loading" shape) plus
+   staggered bouncing dots - the original version only shimmered the core's brightness by 15%
+   with the dots held static, which read as barely-alive rather than "actively working" during
+   the wait for an answer. A dashed-ring-rotating follow-up attempt was still too subtle to
+   clearly read as "loading" at a glance. */
 .orb-thinking .orb-core {
   animation: orb-shimmer 1.8s ease-in-out infinite;
 }
 .orb-thinking .orb-bar {
-  height: 6px;
-  opacity: 0.5;
+  animation: orb-think-bar 1s ease-in-out infinite;
 }
+.orb-thinking .orb-bar-2 { animation-delay: 0.12s; }
+.orb-thinking .orb-bar-3 { animation-delay: 0.24s; }
+.orb-thinking .orb-bar-4 { animation-delay: 0.36s; }
+.orb-thinking .orb-bar-5 { animation-delay: 0.48s; }
 
 /* speaking: bars animate like an equalizer, core pulses subtly */
 .orb-speaking .orb-core {
@@ -992,6 +999,11 @@
 @keyframes orb-speak-bar {
   0%, 100% { height: 8px; }
   50% { height: 32px; }
+}
+
+@keyframes orb-think-bar {
+  0%, 100% { height: 8px; opacity: 0.45; }
+  50% { height: 26px; opacity: 1; }
 }
 
 .avatar-status {

@@ -1,11 +1,13 @@
+import json
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.db.models import Product, SessionRecord, Turn
-from app.db.session import get_db
-from app.rag.generate import generate_answer, generate_core_info
+from app.db.session import SessionLocal, get_db
+from app.rag.generate import generate_answer, generate_answer_stream, generate_core_info
 from app.rag.retrieve import retrieve
 from app.rag.scope_guard import FALLBACK_TEXT
 from app.schemas import CoreInfoResponse, QueryRequest, QueryResponse, RetrievedChunk
@@ -81,6 +83,70 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
         latency_ms=latency_ms,
         turn_number=turn_number,
     )
+
+
+@router.post("/query/stream")
+def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> StreamingResponse:
+    """Same answer as POST /query, but sent as newline-delimited JSON text deltas as the model
+    generates them, instead of one JSON body returned only once generation is fully complete.
+    Lets the client start speaking the first sentence while the model is still writing the rest.
+    Each line is a JSON object: {"delta": "..."} while generating, then one final
+    {"done": true, "turn_number", "in_scope", "latency_ms", "answer_text"} line.
+
+    Does the DB write for this turn with its OWN SessionLocal() rather than the injected `db`,
+    rather than depend on exactly when FastAPI tears down a yield-dependency relative to a
+    StreamingResponse finishing - retrieval/history/product lookups below still use the injected
+    session since those all happen before streaming starts."""
+    session = _get_session_or_404(db, req.session_id)
+    product = db.query(Product).filter(Product.id == session.product_id).first()
+    product_display_name = product.display_name if product else "this medicine"
+    history = _recent_history(db, session.session_id)
+    chunks = retrieve(db, req.query_text, product_id=session.product_id)
+    session_id = session.session_id
+    query_text = req.query_text
+    input_method = req.input_method
+    chunk_ids = [c["chunk_id"] for c in chunks]
+
+    def event_stream():
+        start = time.perf_counter()
+        parts: list[str] = []
+        for delta in generate_answer_stream(query_text, chunks, product_display_name, history):
+            parts.append(delta)
+            yield json.dumps({"delta": delta}) + "\n"
+
+        answer_text = "".join(parts).strip() or FALLBACK_TEXT
+        in_scope = answer_text != FALLBACK_TEXT
+        latency_ms = (time.perf_counter() - start) * 1000
+
+        write_db = SessionLocal()
+        try:
+            turn_number = _next_turn_number(write_db, session_id)
+            write_db.add(Turn(
+                session_id=session_id,
+                turn_number=turn_number,
+                input_method=input_method,
+                query_text=query_text,
+                retrieved_chunk_ids=chunk_ids,
+                response_text=answer_text,
+                in_scope=in_scope,
+                latency_ms=latency_ms,
+            ))
+            write_session = write_db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
+            if write_session is not None:
+                write_session.total_turns = turn_number
+            write_db.commit()
+        finally:
+            write_db.close()
+
+        yield json.dumps({
+            "done": True,
+            "turn_number": turn_number,
+            "in_scope": in_scope,
+            "latency_ms": latency_ms,
+            "answer_text": answer_text,
+        }) + "\n"
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
 @router.post("/core-info", response_model=CoreInfoResponse)

@@ -56,9 +56,9 @@ Mentioning "I took X" is not by itself a personal-risk question - it's only case
 Never give personal health advice or speculate about the participant's individual situation. Never mention "excerpts", "chunks", "corpus", or that you are an AI retrieving documents - speak naturally."""
 
 
-def generate_answer(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None
-) -> str:
+def _build_qa_messages(
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None
+) -> list[dict]:
     excerpts = (
         "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
         if chunks
@@ -74,7 +74,13 @@ def generate_answer(
         messages.append({"role": "user", "content": turn["query"]})
         messages.append({"role": "assistant", "content": turn["answer"]})
     messages.append({"role": "user", "content": user_content})
+    return messages
 
+
+def generate_answer(
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None
+) -> str:
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history)
     resp = _client().chat.completions.create(
         model=settings.openai_generation_model,
         max_tokens=300,
@@ -83,6 +89,27 @@ def generate_answer(
     )
     text = (resp.choices[0].message.content or "").strip()
     return text or FALLBACK_TEXT
+
+
+def generate_answer_stream(
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None
+):
+    """Same call as generate_answer, but yields text deltas as the model produces them instead of
+    blocking for the complete response - lets the caller start synthesizing/speaking the first
+    sentence while the model is still writing the rest, instead of the full answer's generation
+    time sitting entirely in front of the first word spoken."""
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history)
+    stream = _client().chat.completions.create(
+        model=settings.openai_generation_model,
+        max_tokens=300,
+        temperature=0,
+        messages=messages,
+        stream=True,
+    )
+    for event in stream:
+        delta = event.choices[0].delta.content if event.choices else None
+        if delta:
+            yield delta
 
 
 _CORE_INFO_SYSTEM_PROMPT = """You extract structured OTC medicine information from leaflet excerpts for a research kiosk.
