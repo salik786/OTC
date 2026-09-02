@@ -41,6 +41,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
     private ConversationController conversation;
     private SpeechRecognizer speechRecognizer;
     private android.content.Intent recognizerIntent;
+    private LoadingMessageCycler loadingCycler;
 
     private LinearLayout historyContainer;
     private TextView emptyStateTv;
@@ -64,7 +65,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
             public void onSubmitStart() {
                 runOnUiThread(() -> {
                     submitting = true;
-                    setStatus("Thinking...");
+                    loadingCycler.start();
                     updateMicEnabled();
                 });
             }
@@ -73,6 +74,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
             public void onTurnAdded(QATurn turn) {
                 runOnUiThread(() -> {
                     submitting = false;
+                    loadingCycler.stop();
                     addTurnBubbles(turn);
                     setStatus("");
                     updateMicEnabled();
@@ -95,6 +97,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
         });
 
         setContentView(buildRoot());
+        loadingCycler = new LoadingMessageCycler(statusTv);
         initSpeechRecognizer();
         QiSDK.register(this, this);
     }
@@ -106,6 +109,7 @@ public class ChatActivity extends RobotActivity implements RobotLifecycleCallbac
             speechRecognizer.destroy();
             speechRecognizer = null;
         }
+        loadingCycler.stop();
         conversation.stopSpeaking();
         QiSDK.unregister(this, this);
         super.onDestroy();

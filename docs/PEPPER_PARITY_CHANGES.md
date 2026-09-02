@@ -118,6 +118,44 @@ same rebrand).
   non-representational for the tablet's non-embodied condition. Not relevant
   to the physical robot.
 
+## Voice latency work - ported (speech half only)
+
+Ported the sentence-level streaming idea from `frontend-app`'s voice latency work (see
+`docs/ARCHITECTURE.md`), adapted to how Pepper actually speaks:
+
+| Change | frontend-app location | frontend-pepper equivalent | Status |
+|---|---|---|---|
+| Stream the answer from the backend instead of waiting for the whole thing | `lib/api.ts` `queryStream()`, backend `/api/query/stream` | `ApiClient.queryStream()` (new) | **Ported** - reads the same NDJSON response with `BufferedReader`/`charStream()` instead of `fetch()` + `ReadableStream`. |
+| Speak each sentence as soon as it's complete, not the whole answer at once | `hooks/useTTS.ts` `speakStream()` (fetches+plays each sentence's TTS clip) | `ConversationController.submit()` + a per-submit sentence `BlockingQueue` consumed by a background "speaker" thread that runs one QiSDK `Say` per sentence, in order | **Ported**, adapted - no audio-fetch step needed since `Say` generates its own audio on-robot; a `speechToken` counter (same role as the web's) lets a new `submit()` or `stopSpeaking()` supersede an in-flight stream/speaker cleanly. |
+| Animated, rotating "Thinking..." message | `hooks/useLoadingMessage.ts` | `LoadingMessageCycler` (new) | **Ported** - same 4 messages, same 1.5s interval. Wired into both `ChatActivity` and `AvatarChatActivity`; in `AvatarChatActivity` it's stopped as soon as `onSpeakingStateChanged(true)` fires, since speech can now start mid-generation and "Speaking..." should take over at that point (matches `updateStatus()`'s existing priority order). |
+| Product-list load retries with backoff + a "try again" control instead of stranding the screen | `screens/ResearcherSetup.tsx` | `ResearcherSetupActivity.loadProductsAttempt()` | **Ported** - two retries with backoff, then `loadErrorTv` becomes tap-to-retry. |
+
+**Not ported - deliberate judgment call:** the web's progressive on-screen "typing" effect (the
+transcript bubble filling in as the answer streams) was **not** ported. `addTurnBubbles()` /
+`addTranscriptTurn()` still add the Q+A pair to the transcript only once the full answer is known,
+same as before this pass. Reasoning: Pepper's speech is the primary channel and the on-screen
+transcript is secondary (same reasoning as the existing "Passive TTS auto-narration" judgment call
+above) - the actual latency win participants experience is Pepper starting to *talk* sooner, which
+is what got ported; a live-typing transcript would need each `ChatActivity`/`AvatarChatActivity`
+turn-bubble to become a mutable, in-place-updated view instead of an append-once one, which was
+judged not worth the added complexity for a secondary display.
+
+Also not applicable: the backend's genuinely-streaming `/api/tts` and the switch to
+`gpt-4o-mini-tts` - Pepper never called `/api/tts` in the first place (see `ConversationController`
+header comment), so neither change affects it.
+
+`./gradlew assembleDebug` succeeds (JDK 17 workaround still required - see below). Verified on the
+`Pepper_1.9_API_29` emulator against the production backend: submitted a typed question in both
+`ChatActivity` and `AvatarChatActivity`, confirmed the new `/api/query/stream` round trip
+completes cleanly with the correct, leaflet-accurate answer, the loading indicator shows while
+waiting, and the UI resets correctly afterward (input cleared, buttons re-enabled, status back to
+idle) - no crashes or exceptions in either path. This emulator has no paired robot, so
+`qiContext` never becomes non-null and QiSDK `Say` never actually fires - the sentence-queue /
+`speechToken` / speaking-state logic that depends on that (the actual "does Pepper start talking
+sooner" behavior) could only be verified by code review here, not on-device playback. That needs
+confirming on the physical robot or a QiSDK-robot-simulator-capable emulator before relying on it
+for the study.
+
 ## Build environment note
 
 `./gradlew assembleDebug` was crashing with a dexer (R8) internal

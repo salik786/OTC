@@ -176,11 +176,21 @@ public class ResearcherSetupActivity extends RobotActivity implements RobotLifec
         return scroll;
     }
 
+    /** A single failed request here used to strand the screen permanently, needing an app
+     * restart to recover - too easy to trip from a brief backend hiccup (e.g. a Render redeploy
+     * restarting the server). Retries twice with backoff before giving up, matching
+     * frontend-app/src/screens/ResearcherSetup.tsx's fix; loadErrorTv becomes tappable to retry
+     * again once it does give up. */
     private void loadProducts() {
+        loadProductsAttempt(0);
+    }
+
+    private void loadProductsAttempt(int attempt) {
         ApiClient.listProducts(new ApiClient.ApiCallback<List<ApiClient.Product>>() {
             @Override
             public void onSuccess(List<ApiClient.Product> result) {
                 runOnUiThread(() -> {
+                    loadErrorTv.setOnClickListener(null);
                     products.clear();
                     products.addAll(result);
                     if (products.isEmpty()) {
@@ -203,9 +213,19 @@ public class ResearcherSetupActivity extends RobotActivity implements RobotLifec
             @Override
             public void onError(String message) {
                 runOnUiThread(() -> {
-                    Log.e(TAG, "listProducts failed: " + message);
-                    loadErrorTv.setText("Could not load the medicine list. Check the connection and reload.");
+                    Log.e(TAG, "listProducts failed (attempt " + attempt + "): " + message);
+                    if (attempt < 2) {
+                        loadErrorTv.getHandler().postDelayed(
+                                () -> loadProductsAttempt(attempt + 1), 1000L * (attempt + 1));
+                        return;
+                    }
+                    loadErrorTv.setText("Could not load the medicine list. Check the connection and tap to try again.");
                     loadErrorTv.setVisibility(View.VISIBLE);
+                    loadErrorTv.setOnClickListener(v -> {
+                        loadErrorTv.setText("Loading medicines...");
+                        loadErrorTv.setOnClickListener(null);
+                        loadProductsAttempt(0);
+                    });
                 });
             }
         });

@@ -116,6 +116,29 @@ public final class ApiClient {
         }
     }
 
+    /** Final event of a /api/query/stream response - same fields as QueryResponse plus the
+     * full assembled answer text (the deltas already gave the caller this piecemeal, but the
+     * final string is included so callers don't have to reassemble it themselves). */
+    public static class QueryStreamResult {
+        public final String answerText;
+        public final boolean inScope;
+        public final int turnNumber;
+
+        QueryStreamResult(JSONObject o) throws Exception {
+            answerText = o.getString("answer_text");
+            inScope = o.getBoolean("in_scope");
+            turnNumber = o.getInt("turn_number");
+        }
+    }
+
+    public interface StreamCallback {
+        /** Called on a background thread, once per NDJSON delta line, as the answer generates. */
+        void onDelta(String delta);
+        /** Called once on a background thread after the final NDJSON line. */
+        void onDone(QueryStreamResult result);
+        void onError(String message);
+    }
+
     // ---- Calls ----
 
     /** Public (no-auth) medicine list - only products with an active ingested document, matching
@@ -182,6 +205,47 @@ public final class ApiClient {
             JSONObject resp = post("/api/query", body);
             return new QueryResponse(resp);
         }, cb);
+    }
+
+    /** Streaming counterpart to query(): the backend streams the answer as it's generated (NDJSON
+     * lines - {"delta": "..."} while generating, then one {"done": true, ...} line), instead of
+     * making the caller wait for the whole answer before it can do anything - the native
+     * equivalent of frontend-app/src/lib/api.ts's queryStream(). Runs entirely on a background
+     * thread; cb methods are NOT marshalled to the UI thread (same as every other ApiClient call -
+     * callers already runOnUiThread() where needed). */
+    public static void queryStream(String sessionId, String queryText, String inputMethod, StreamCallback cb) {
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject()
+                        .put("session_id", sessionId)
+                        .put("query_text", queryText)
+                        .put("input_method", inputMethod);
+                RequestBody requestBody = RequestBody.create(body.toString(), JSON);
+                Request request = new Request.Builder()
+                        .url(BuildConfig.API_BASE_URL + "/api/query/stream")
+                        .post(requestBody)
+                        .build();
+                try (Response response = CLIENT.newCall(request).execute()) {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        String errBody = response.body() != null ? response.body().string() : "";
+                        throw new Exception("HTTP " + response.code() + ": " + errBody);
+                    }
+                    java.io.BufferedReader reader = new java.io.BufferedReader(response.body().charStream());
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.trim().isEmpty()) continue;
+                        JSONObject event = new JSONObject(line);
+                        if (event.has("delta")) {
+                            cb.onDelta(event.getString("delta"));
+                        } else if (event.optBoolean("done", false)) {
+                            cb.onDone(new QueryStreamResult(event));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                cb.onError(e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }).start();
     }
 
     // ---- Internals ----

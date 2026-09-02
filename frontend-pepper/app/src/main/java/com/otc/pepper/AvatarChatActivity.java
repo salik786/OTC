@@ -40,6 +40,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
     private ConversationController conversation;
     private SpeechRecognizer speechRecognizer;
     private Intent recognizerIntent;
+    private LoadingMessageCycler loadingCycler;
 
     private TextView statusTv;
     private android.widget.ImageView micBtn;
@@ -68,6 +69,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             public void onSubmitStart() {
                 runOnUiThread(() -> {
                     submitting = true;
+                    loadingCycler.start();
                     updateStatus();
                 });
             }
@@ -76,6 +78,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             public void onTurnAdded(QATurn turn) {
                 runOnUiThread(() -> {
                     submitting = false;
+                    loadingCycler.stop();
                     addTranscriptTurn(turn);
                     updateStatus();
                 });
@@ -90,6 +93,11 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             public void onSpeakingStateChanged(boolean isSpeaking) {
                 runOnUiThread(() -> {
                     speaking = isSpeaking;
+                    // Speech now starts mid-generation (see ConversationController) - the loading
+                    // cycler owns statusTv text only up until the first sentence actually starts
+                    // speaking, at which point "Speaking..." (below, via updateStatus()) takes over.
+                    if (isSpeaking) loadingCycler.stop();
+                    else if (submitting) loadingCycler.start();
                     updateStatus();
                     if (!isSpeaking && voiceModeActive && !recording && !submitting && !showTyped) {
                         startListening();
@@ -99,6 +107,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         });
 
         setContentView(buildRoot());
+        loadingCycler = new LoadingMessageCycler(statusTv);
         initSpeechRecognizer();
         QiSDK.register(this, this);
     }
@@ -110,6 +119,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
             speechRecognizer.destroy();
             speechRecognizer = null;
         }
+        loadingCycler.stop();
         conversation.stopSpeaking();
         QiSDK.unregister(this, this);
         super.onDestroy();
