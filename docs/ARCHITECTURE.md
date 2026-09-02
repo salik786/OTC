@@ -80,9 +80,12 @@ FastAPI app (`backend/app/main.py`) with these route groups:
    captures any preamble text before the first header as an "Overview" chunk (previously silently
    dropped), embeds with `text-embedding-3-large`, and rebuilds the FAISS index for that product.
 
-### Streaming voice pipeline (web only so far — see "Not yet ported to Pepper")
+### Streaming voice pipeline
 
-To cut voice-mode latency, `frontend-app` no longer waits for a full answer before speaking:
+To cut voice-mode latency, neither condition waits for a full answer before speaking anymore.
+`frontend-app` and `frontend-pepper` share the streaming backend endpoint but speak the answer
+through different mechanisms - the tablet fetches and plays TTS audio clips, Pepper speaks
+natively through QiSDK, which never called the backend's TTS proxy in the first place:
 
 - `POST /api/query/stream` streams the LLM's answer as NDJSON deltas (`{"delta": "..."}` lines,
   then a final `{"done": true, ...}` line with the persisted turn's metadata).
@@ -156,11 +159,23 @@ deflected) saves to the admin panel with the right product, platform, and turn d
 - Added retry-with-backoff + a "Try again" control to the participant app's product-list load, so
   a transient backend hiccup (e.g. a Render redeploy window) no longer permanently strands the
   screen requiring a full page reload.
+- Ported the sentence-streaming idea to `frontend-pepper`: it now also calls
+  `/api/query/stream` and speaks each sentence via QiSDK `Say` as soon as it's complete (a
+  `BlockingQueue` + background "speaker" thread stands in for the web's audio-clip queue, since
+  `Say` generates its own audio on-robot — no fetch step needed), plus the same rotating loading
+  message and a matching retry-with-backoff fix for its own product list load. The web's
+  progressive on-screen "typing" effect was deliberately **not** ported — Pepper's speech is the
+  primary channel and the transcript is secondary, so it still only updates once the full answer
+  is known. See [PEPPER_PARITY_CHANGES.md](PEPPER_PARITY_CHANGES.md) for the full breakdown of
+  what did and didn't port, plus a batch of physical-screen-only layout bugs (orb clipping,
+  off-screen content, header misalignment, an invisible dropdown arrow) found and fixed once real
+  Pepper screenshots were available — none of these were visible on the dev emulator, which is
+  noticeably larger than the physical screen.
 
-## Not yet ported to Pepper
+## Verification caveat
 
-The streaming voice pipeline (`/api/query/stream`, sentence-level TTS pipelining, the loading
-message animation, the scroll fix, the product-list retry fix) exists only in `frontend-app` so
-far. `frontend-pepper` still uses the older buffered `/api/query` + full-clip `/api/tts` flow.
-Porting this is the next parity item once the tablet-side testing pass is complete — track it in
-[PEPPER_PARITY_CHANGES.md](PEPPER_PARITY_CHANGES.md) when it happens.
+The Pepper voice-streaming port above was verified end-to-end on the `Pepper_1.9_API_29` emulator
+against the production backend (correct answers, no crashes), and the layout bugs were verified by
+resizing that same emulator down to 800x480. Neither the emulator's QiSDK speech output nor its
+exact screen dimensions are guaranteed to match the physical robot — a pass on the actual hardware
+is still needed before relying on either for the study.
