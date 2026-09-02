@@ -248,7 +248,19 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         endBtn.setOnClickListener(v -> endSession());
         main.addView(endBtn, wrapWithMargins(0, UiKit.dp(this, 20), 0, 0));
 
-        root.addView(main, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // main holds a fixed-size 220dp orb plus status/dock/end-session content - on a screen
+        // shorter than this was originally tested on (the physical Pepper screen is shorter than
+        // the dev emulator), that combined WRAP_CONTENT height can exceed what's actually
+        // available, and since main itself was never scrollable, the overflow was simply
+        // inaccessible - the orb and everything below it could render entirely off-screen with no
+        // way to reach it (a real bug spotted on the physical screen: the whole voice-mode screen
+        // below the back/MedCheck row was blank). Wrapping it in a ScrollView means Android caps
+        // main's measured height to whatever's actually available and makes the rest reachable by
+        // scrolling, instead of silently overflowing past the screen edge.
+        ScrollView mainScroll = new ScrollView(this);
+        mainScroll.addView(main, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        root.addView(mainScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         transcriptScroll = new ScrollView(this);
         transcriptContainer = new LinearLayout(this);

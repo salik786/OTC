@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.aldebaran.qi.sdk.QiContext;
@@ -50,11 +51,19 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
         Log.e(TAG, "Robot focus refused: " + reason);
     }
 
-    private LinearLayout buildRoot() {
+    // Not scrollable before this pass - on a shorter real screen than this was originally tested
+    // on, the two mode cards (or the space below them) could end up genuinely below the visible
+    // area with no way to reach them, since a plain LinearLayout doesn't clip-and-hide gracefully,
+    // it just extends off-screen. Wrapping in a ScrollView (same pattern already used on
+    // ResearcherSetupActivity for the same reason) means content is always reachable regardless of
+    // screen height, at the cost of nothing when it already fit.
+    private ScrollView buildRoot() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackground(UiKit.screenBackground(this));
+
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
-        col.setBackground(UiKit.screenBackground(this));
         col.setPadding(UiKit.dp(this, 24), UiKit.dp(this, 16), UiKit.dp(this, 24), UiKit.dp(this, 24));
 
         LinearLayout.LayoutParams topNavLp = new LinearLayout.LayoutParams(
@@ -83,7 +92,9 @@ public class ModeSelectActivity extends RobotActivity implements RobotLifecycleC
 
         col.addView(row, wrap());
 
-        return col;
+        scroll.addView(col, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        return scroll;
     }
 
     private LinearLayout modeCard(int iconRes, String title, String desc, android.view.View.OnClickListener onClick) {

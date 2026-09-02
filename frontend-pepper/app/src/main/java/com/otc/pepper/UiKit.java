@@ -354,6 +354,21 @@ final class UiKit {
         headerWrap.addView(brandHeader(ctx, true));
         row.addView(headerWrap, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
+        // An invisible mirror of the back button, same size, on the right - without this the
+        // header only centers in the space to the RIGHT of the back button, not across the row's
+        // full width, so it visually sits off-center relative to any content below this row that
+        // IS centered across the full width (e.g. AvatarChatActivity's orb/status/dock column) -
+        // spotted as a real misalignment on the physical Pepper screen. Mirroring the back
+        // button's width on the other side restores true full-width centering for the header
+        // while keeping the original "never overlaps the back button" guarantee (if anything, the
+        // header's available space is now smaller, so it's even safer).
+        Button backMirror = ghostButtonWithIcon(ctx, R.drawable.ic_back, "Back");
+        backMirror.setVisibility(View.INVISIBLE);
+        backMirror.setEnabled(false);
+        backMirror.setClickable(false);
+        row.addView(backMirror, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         return row;
     }
 
@@ -455,9 +470,32 @@ final class UiKit {
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
 
+        // core keeps an explicit fixed size (not MATCH_PARENT) so it reliably measures to exactly
+        // 220dp in every context - a fixed dp/px LayoutParams value always resolves to an EXACTLY
+        // spec regardless of what spec core's own parent received, whereas a MATCH_PARENT child
+        // inherits its parent's spec *type* too: a first attempt at this fix used MATCH_PARENT and
+        // broke as soon as this orb ended up inside a ScrollView (added for a separate fix, see
+        // AvatarChatActivity) - ScrollView always measures its immediate content with an
+        // UNSPECIFIED height, which cascades down and made core (whose only real content, the dots
+        // row, is tiny) measure to near-nothing instead of 220dp.
+        //
+        // outer.setClipChildren(false) is the actual guard against the original bug this was
+        // written for: outer's own WRAP_CONTENT size (backed by setMinimumWidth/Height below) is
+        // normally >= `size`, but a caller's addView(orbView, someLayoutParams) always overrides
+        // whatever LayoutParams outer is given right here, and on a screen narrower than this was
+        // first tested on (the physical Pepper screen vs. the dev emulator), outer could still end
+        // up measured smaller than core's fixed 220dp. Without disabling child-clipping, core would
+        // get hard-clipped to outer's narrower bounds, producing a circle with flat vertical edges
+        // instead of a smooth taper - the actual bug spotted on the physical screen. With it
+        // disabled, core still renders at its full round size even if that means it overflows
+        // outer's own (rare, narrow-screen) bounds slightly, which reads far better than a visibly
+        // clipped circle.
         android.widget.FrameLayout outer = new android.widget.FrameLayout(ctx);
         outer.addView(core, new android.widget.FrameLayout.LayoutParams(size, size, Gravity.CENTER));
-        outer.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        outer.setMinimumWidth(size);
+        outer.setMinimumHeight(size);
+        outer.setClipChildren(false);
+        outer.setClipToPadding(false);
 
         android.animation.ObjectAnimator breathe = android.animation.ObjectAnimator.ofPropertyValuesHolder(
                 core,

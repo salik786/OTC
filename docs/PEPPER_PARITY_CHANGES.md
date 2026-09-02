@@ -11,6 +11,58 @@ behavior, so nothing gets forgotten when Pepper work resumes.
 
 ---
 
+## Physical-screen layout bugs (found via real Pepper screenshots, not the dev emulator)
+
+The dev emulator (`Pepper_1.9_API_29`) used throughout this project's testing is 1280x800 -
+noticeably larger/wider than the physical Pepper's actual screen. Four real layout bugs were
+invisible on the emulator and only showed up on the physical screen; reproduced locally by
+resizing the emulator down to 800x480 (`adb shell wm size 800x480`) rather than needing the robot
+itself. All four fixed in `UiKit.java`, `AvatarChatActivity.java`, `ModeSelectActivity.java`,
+`ResearcherSetupActivity.java`:
+
+1. **The orb (`UiKit.orb()`) rendered with flat-cut left/right edges instead of a full circle.**
+   Root cause: the orb's outer wrapper only *requests* a 220dp minimum size, but a caller's
+   `addView(orbView, someLayoutParams)` always overrides that - on a screen where the available
+   width came out narrower than 220dp, the inner circle got hard-clipped to the wrapper's smaller
+   actual bounds. Fixed with `outer.setClipChildren(false)` so the circle always renders at its
+   full round size even if that means slightly overflowing tight bounds, instead of being clipped.
+   (A first attempt fixed this by making the inner circle `MATCH_PARENT` instead - that broke
+   differently, and worse, once combined with fix #2 below: a `ScrollView` always measures its
+   immediate child with an unspecified height, and that ambiguity cascaded down through
+   `MATCH_PARENT` and collapsed the circle to almost nothing. Reverted to a fixed-size inner
+   circle, which measures correctly regardless of the surrounding container.)
+2. **On `AvatarChatActivity`, the orb and everything below the back/MedCheck row could render
+   entirely off-screen with no way to reach it.** Root cause: the section holding the orb, status
+   text, mic dock, and end-session button was a plain (non-scrolling) `LinearLayout` sized to its
+   own content - on a screen shorter than the emulator, its total content height could exceed
+   what's actually available, and unlike a `ScrollView`, a plain `LinearLayout` doesn't clip and
+   hide gracefully, it just extends past the screen edge with nothing to scroll. Fixed by wrapping
+   that whole section in its own `ScrollView`.
+3. **"MedCheck" in the top bar didn't line up with content below it that's centered across the
+   full screen width** (the orb, on `AvatarChatActivity`). Root cause: `UiKit.topNav()`'s header
+   only centers in the space to the *right* of the back button, by design (to guarantee it can
+   never overlap the back button on a narrow screen) - but that means its centering axis is offset
+   from anything below it that centers across the *full* row width. Fixed by adding an invisible,
+   same-size mirror of the back button on the right side of the row, so the header now centers
+   across the true full width while keeping the original "never overlaps the back button"
+   guarantee (if anything, its available space is now smaller, so it's safer, not less safe).
+4. **The medicine-picker `Spinner` on the launcher screen didn't look like a dropdown at all** -
+   just a plain rounded box with no arrow/caret. Root cause: `spinner.setBackground(...)` replaces
+   the platform's entire default background, which is also where the built-in dropdown-arrow
+   indicator lives. Fixed by overlaying a plain "▾" glyph (not a vector icon or emoji - a basic
+   Unicode geometric character, safe on Pepper's Android 6.0 build) on the right side, non-
+   clickable so touches still pass through to the Spinner underneath.
+5. **`ModeSelectActivity`'s two mode cards had the same "could render off-screen with no way to
+   reach it" problem as #2** - its root was also a plain, non-scrolling `LinearLayout`. Fixed the
+   same way, wrapping it in a `ScrollView` (matching the pattern already used on
+   `ResearcherSetupActivity`).
+
+Not yet chased down: a reported "Chat UI is not properly visible" issue on `ChatActivity`
+specifically - re-tested at the same 800x480 resolution used to reproduce the above and the screen
+looked correctly laid out (header, empty-state text, input bar, mic/Ask buttons, end-session link
+all visible and reachable). Needs an actual screenshot of the specific problem to chase further;
+may simply have been a consequence of one of the above bugs rather than a separate one.
+
 ## Already shared automatically (backend changes - nothing to port)
 
 These live in `backend/`, so both `frontend-app` and `frontend-pepper` get them

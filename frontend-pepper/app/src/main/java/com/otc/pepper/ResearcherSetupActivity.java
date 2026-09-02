@@ -128,17 +128,42 @@ public class ResearcherSetupActivity extends RobotActivity implements RobotLifec
         labelRow.addView(label);
         card.addView(labelRow, wrapWithMargins(0, 0, 0, UiKit.dp(this, 8)));
 
+        // A custom setBackground() on a Spinner replaces the platform's default background
+        // outright, which is also where the built-in dropdown-arrow affordance lives - leaving a
+        // plain rounded box with no visual hint it's a dropdown at all (spotted on the physical
+        // Pepper screen). Since there's no vector icon for a chevron in this project yet, draw one
+        // as a plain "▾" glyph overlaid on top - it's a basic geometric character (not a color
+        // emoji), so it's unaffected by the emoji-glyph gap on Pepper's Android 6.0 build that
+        // vector icons were already introduced to work around elsewhere in this file. The overlay
+        // TextView isn't clickable/focusable, so touches pass through to the Spinner beneath it.
+        android.widget.FrameLayout spinnerWrap = new android.widget.FrameLayout(this);
+
         spinner = new Spinner(this);
         android.graphics.drawable.GradientDrawable spinnerBg = new android.graphics.drawable.GradientDrawable();
         spinnerBg.setColor(UiKit.COLOR_SURFACE);
         spinnerBg.setStroke(UiKit.dp(this, 2), UiKit.COLOR_BORDER);
         spinnerBg.setCornerRadius(UiKit.dp(this, 12));
         spinner.setBackground(spinnerBg);
-        spinner.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 12), UiKit.dp(this, 16), UiKit.dp(this, 12));
+        spinner.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 12), UiKit.dp(this, 40), UiKit.dp(this, 12));
+        spinnerWrap.addView(spinner, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView chevron = new TextView(this);
+        chevron.setText("▾");
+        chevron.setTextColor(UiKit.COLOR_TEXT_MUTED);
+        chevron.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+        chevron.setClickable(false);
+        chevron.setFocusable(false);
+        android.widget.FrameLayout.LayoutParams chevronLp = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_VERTICAL | Gravity.END);
+        chevronLp.rightMargin = UiKit.dp(this, 16);
+        spinnerWrap.addView(chevron, chevronLp);
+
         LinearLayout.LayoutParams spinnerLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         spinnerLp.bottomMargin = UiKit.dp(this, 20);
-        card.addView(spinner, spinnerLp);
+        card.addView(spinnerWrap, spinnerLp);
 
         loadErrorTv = UiKit.errorText(this, "Loading medicines...");
         card.addView(loadErrorTv, wrapWithMargins(0, 0, 0, UiKit.dp(this, 12)));
