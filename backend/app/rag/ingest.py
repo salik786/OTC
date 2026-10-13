@@ -18,7 +18,7 @@ SECTION_HEADERS = [
     "dosage", "dose", "directions", "how to take", "how to use", "supplement facts", "drug facts",
     "warnings", "precautions", "do not use if", "when to ask a pharmacist", "ask a doctor",
     "storage", "expiry", "how long to use once opened", "other information",
-    "missed dose", "if you miss a dose",
+    "missed dose", "if you miss a dose", "other medicines", "pregnancy", "overdose",
     "side effects", "ingredients", "active ingredient", "active ingredients", "inactive ingredients",
     "other ingredients", "questions", "questions or comments",
 ]

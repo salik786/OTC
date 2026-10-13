@@ -47,7 +47,7 @@ def _seed_corpus() -> None:
     chunks (and deflect on every question) until someone re-uploads leaflets by hand. Bootstraps
     from SEED_CORPUS_DIR (baked into the git-committed image, outside the volume mount so it can't
     be shadowed), only for products that don't already have an active document (so a real
-    admin-uploaded leaflet is never overwritten by the placeholder)."""
+    admin-uploaded leaflet is never overwritten by the seed leaflet)."""
     db = SessionLocal()
     try:
         for slug, _ in SEED_PRODUCTS:
@@ -58,12 +58,12 @@ def _seed_corpus() -> None:
             if has_active_doc:
                 logger.info("corpus seed: %s already has an active document, skipping", slug)
                 continue
-            corpus_path = SEED_CORPUS_DIR / f"{slug}_placeholder.txt"
+            corpus_path = SEED_CORPUS_DIR / f"{slug}_leaflet.txt"
             if not corpus_path.exists():
-                logger.warning("corpus seed: no placeholder file at %s for %s - product will have zero retrievable content", corpus_path, slug)
+                logger.warning("corpus seed: no seed leaflet file at %s for %s - product will have zero retrievable content", corpus_path, slug)
                 continue
             ingest_document(db, slug, corpus_path.name, corpus_path.read_bytes())
-            logger.info("corpus seed: ingested placeholder leaflet for %s", slug)
+            logger.info("corpus seed: ingested seed leaflet for %s", slug)
     finally:
         db.close()
 

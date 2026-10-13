@@ -5,8 +5,12 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.aldebaran.qi.Future;
@@ -19,12 +23,12 @@ import com.aldebaran.qi.sdk.object.conversation.Say;
 
 /**
  * Native port of frontend-app/src/screens/Closing.tsx. Kiosk sessions must be a dead end for the
- * ~4s it displays - the web version traps the browser back button with history.pushState; the
- * Android equivalent is overriding onBackPressed() to swallow the back press. After that window,
- * it auto-resets to the setup screen for the next participant (matching the tablet's
- * handleResetToStart), clearing the whole back stack so there's no way to navigate back into the
- * ended session - previously this was a genuine dead end with no way back to a fresh session
- * short of force-closing the app.
+ * time it displays - the web version traps the browser back button with history.pushState; the
+ * Android equivalent is overriding onBackPressed() to swallow the back press. It shows the
+ * post-session survey QR code (long enough for the participant to scan it), then auto-resets to
+ * the setup screen for the next participant (matching the tablet's handleResetToStart) - or
+ * immediately via the Finish button - clearing the whole back stack so there's no way to navigate
+ * back into the ended session.
  */
 public class ClosingActivity extends RobotActivity implements RobotLifecycleCallbacks {
 
@@ -32,7 +36,8 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
     private static final String CLOSING_TEXT =
             "Thank you for using this system. I hope the information was helpful. The researcher " +
             "will now ask you a few questions. Goodbye!";
-    private static final long RESET_DELAY_MS = 4000;
+    // Long enough to scan the survey QR code; the Finish button resets immediately instead.
+    private static final long RESET_DELAY_MS = 120000;
 
     private QiContext qiContext;
     private Future<Void> sayFuture;
@@ -93,14 +98,19 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
         finish();
     }
 
-    private LinearLayout buildRoot() {
+    private ScrollView buildRoot() {
+        // Scrollable + fillViewport so content stays centered on a tall screen but is still
+        // reachable on a short one (the QR block makes this screen taller than it used to be).
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(UiKit.COLOR_PRIMARY);
+
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER);
-        col.setBackgroundColor(UiKit.COLOR_PRIMARY);
-        col.setPadding(UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40), UiKit.dp(this, 40));
+        col.setPadding(UiKit.dp(this, 40), UiKit.dp(this, 32), UiKit.dp(this, 40), UiKit.dp(this, 32));
 
-        col.addView(UiKit.brandHeader(this, false, true), wrapWithMaxWidth(0, UiKit.dp(this, 24)));
+        col.addView(UiKit.brandHeader(this, false, true), wrapWithMaxWidth(0, UiKit.dp(this, 16)));
 
         TextView title = UiKit.heading(this, "Thank you");
         title.setTextColor(0xFFFFFFFF);
@@ -110,7 +120,7 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
         TextView lede = UiKit.body(this, CLOSING_TEXT);
         lede.setTextColor(0xFFFFFFFF);
         UiKit.center(lede);
-        col.addView(lede, wrapWithMaxWidth(UiKit.dp(this, 16), UiKit.dp(this, 8)));
+        col.addView(lede, wrapWithMaxWidth(UiKit.dp(this, 12), UiKit.dp(this, 8)));
 
         TextView muted = new TextView(this);
         muted.setText("This session has ended.");
@@ -119,11 +129,64 @@ public class ClosingActivity extends RobotActivity implements RobotLifecycleCall
         UiKit.center(muted);
         col.addView(muted, wrap());
 
-        return col;
+        // Survey QR code on a white card (a QR needs a light quiet zone around it to scan).
+        LinearLayout qrCard = new LinearLayout(this);
+        qrCard.setOrientation(LinearLayout.VERTICAL);
+        qrCard.setGravity(Gravity.CENTER_HORIZONTAL);
+        GradientDrawable qrBg = new GradientDrawable();
+        qrBg.setColor(0xFFFFFFFF);
+        qrBg.setCornerRadius(UiKit.dp(this, 16));
+        qrCard.setBackground(qrBg);
+        qrCard.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 12), UiKit.dp(this, 12), UiKit.dp(this, 10));
+
+        ImageView qr = new ImageView(this);
+        qr.setImageResource(R.drawable.qr_survey_pepper);
+        qr.setAdjustViewBounds(true);
+        qr.setContentDescription("QR code linking to the study survey");
+        qrCard.addView(qr, new LinearLayout.LayoutParams(UiKit.dp(this, 190), UiKit.dp(this, 190)));
+
+        TextView qrCaption = new TextView(this);
+        qrCaption.setText("Scan this QR code to complete a short survey.");
+        qrCaption.setTextColor(UiKit.COLOR_PRIMARY);
+        qrCaption.setTextSize(13);
+        qrCaption.setTypeface(null, android.graphics.Typeface.BOLD);
+        UiKit.center(qrCaption);
+        qrCard.addView(qrCaption, wrapWithMargins(0, UiKit.dp(this, 6), 0, 0));
+
+        LinearLayout.LayoutParams qrLp = wrap();
+        qrLp.topMargin = UiKit.dp(this, 16);
+        col.addView(qrCard, qrLp);
+
+        // Researcher-facing: skip the wait and go straight to a fresh session.
+        Button finish = new Button(this);
+        finish.setText("Finish");
+        finish.setAllCaps(false);
+        finish.setTextColor(0xFFFFFFFF);
+        finish.setTypeface(null, android.graphics.Typeface.BOLD);
+        GradientDrawable finishBg = new GradientDrawable();
+        finishBg.setColor(0x00000000);
+        finishBg.setCornerRadius(999f);
+        finishBg.setStroke(UiKit.dp(this, 2), 0x99FFFFFF);
+        finish.setBackground(finishBg);
+        finish.setPadding(UiKit.dp(this, 32), UiKit.dp(this, 8), UiKit.dp(this, 32), UiKit.dp(this, 8));
+        finish.setOnClickListener(v -> resetToStart());
+        LinearLayout.LayoutParams finishLp = wrap();
+        finishLp.topMargin = UiKit.dp(this, 16);
+        col.addView(finish, finishLp);
+
+        scroll.addView(col, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        return scroll;
     }
 
     private LinearLayout.LayoutParams wrap() {
         return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+    }
+
+    private LinearLayout.LayoutParams wrapWithMargins(int l, int t, int r, int b) {
+        LinearLayout.LayoutParams lp = wrap();
+        lp.setMargins(l, t, r, b);
+        return lp;
     }
 
     private LinearLayout.LayoutParams wrapWithMaxWidth(int marginTop, int marginBottom) {
