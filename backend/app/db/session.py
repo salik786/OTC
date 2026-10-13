@@ -1,7 +1,7 @@
 import os
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
@@ -26,6 +26,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()
+
+
+def _add_missing_columns() -> None:
+    """create_all only creates missing TABLES - it never adds a column to one that already exists,
+    and this project has no migration tool. So any column added after a database was first created
+    (e.g. production's) is added here, idempotently and as nullable, before anything queries it."""
+    existing = {c["name"] for c in inspect(engine).get_columns("turns")}
+    if "retrieved_chunks" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE turns ADD COLUMN retrieved_chunks JSON"))
 
 
 def get_db() -> Generator[Session, None, None]:

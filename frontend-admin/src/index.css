@@ -260,3 +260,13 @@ td {
   background: #ececec;
   color: #555;
 }
+
+.retrieved-chunks {
+  margin-top: 6px;
+}
+
+.retrieved-chunk {
+  border-left: 3px solid var(--border, #d6d6d6);
+  padding-left: 10px;
+  margin-top: 6px;
+}

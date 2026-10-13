@@ -134,11 +134,23 @@ class SessionSummaryOut(BaseModel):
     errors_logged: int
 
 
+class RetrievedChunkLog(BaseModel):
+    """One retrieved chunk as stored on a turn - includes the exact text, unlike retrieved_chunk_ids."""
+    rank: int
+    chunk_id: str
+    section_label: str | None = None
+    score: float
+    text: str
+    document_id: str | None = None
+    document_filename: str | None = None
+
+
 class TurnOut(BaseModel):
     turn_number: int
     input_method: str
     query_text: str
     retrieved_chunk_ids: list[str]
+    retrieved_chunks: list[RetrievedChunkLog] = []
     response_text: str
     in_scope: bool
     latency_ms: float

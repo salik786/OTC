@@ -283,10 +283,28 @@ export function Sessions() {
                   <p>
                     <strong>A{!t.in_scope ? " (deflected)" : ""}:</strong> {t.response_text}
                   </p>
-                  {t.retrieved_chunk_ids.length > 0 && (
-                    <p className="muted mono" style={{ fontSize: "0.75rem" }}>
-                      chunks: {t.retrieved_chunk_ids.map((id) => id.slice(0, 8)).join(", ")}
-                    </p>
+                  {t.retrieved_chunks.length > 0 ? (
+                    <details className="retrieved-chunks">
+                      <summary className="muted" style={{ fontSize: "0.8rem", cursor: "pointer" }}>
+                        Retrieved {t.retrieved_chunks.length} chunks:{" "}
+                        {t.retrieved_chunks.map((c) => `${c.section_label ?? "?"} (${c.score.toFixed(2)})`).join(" · ")}
+                      </summary>
+                      {t.retrieved_chunks.map((c) => (
+                        <div key={c.chunk_id} className="retrieved-chunk">
+                          <div className="muted mono" style={{ fontSize: "0.72rem" }}>
+                            #{c.rank} · {c.section_label ?? "no section"} · score {c.score.toFixed(3)}
+                            {c.document_filename ? ` · ${c.document_filename}` : ""} · id {c.chunk_id.slice(0, 8)}
+                          </div>
+                          <pre style={{ whiteSpace: "pre-wrap", margin: "2px 0 8px 0", fontSize: "0.8rem" }}>{c.text}</pre>
+                        </div>
+                      ))}
+                    </details>
+                  ) : (
+                    t.retrieved_chunk_ids.length > 0 && (
+                      <p className="muted mono" style={{ fontSize: "0.75rem" }}>
+                        chunks (text not stored for this older turn): {t.retrieved_chunk_ids.map((id) => id.slice(0, 8)).join(", ")}
+                      </p>
+                    )
                   )}
                 </div>
               ))}

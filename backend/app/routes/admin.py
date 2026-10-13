@@ -155,7 +155,8 @@ def get_session_turns(session_id: str, db: DBSession = Depends(get_db)) -> list[
     return [
         TurnOut(
             turn_number=t.turn_number, input_method=t.input_method, query_text=t.query_text,
-            retrieved_chunk_ids=t.retrieved_chunk_ids, response_text=t.response_text,
+            retrieved_chunk_ids=t.retrieved_chunk_ids, retrieved_chunks=t.retrieved_chunks or [],
+            response_text=t.response_text,
             in_scope=t.in_scope, latency_ms=t.latency_ms, timestamp=t.timestamp,
         )
         for t in turns
@@ -170,6 +171,16 @@ def delete_session(session_id: str, db: DBSession = Depends(get_db)) -> dict:
     db.delete(session)  # cascades to Turn rows via the relationship's delete-orphan cascade
     db.commit()
     return {"deleted": session_id}
+
+
+def chunk_sections(t) -> str:
+    """Readable one-cell summary for spreadsheets: 'Missed Dose (0.62) | Overdose (0.48)'."""
+    return " | ".join(f"{c.get('section_label')} ({c.get('score', 0):.2f})" for c in (t.retrieved_chunks or []))
+
+
+def chunk_json(t) -> str:
+    """Full retrieved snapshot (exact text, score, source leaflet) as JSON, one cell per turn."""
+    return json.dumps(t.retrieved_chunks or [], ensure_ascii=False)
 
 
 @router.get("/sessions/export")
@@ -203,7 +214,8 @@ def export_all_sessions(
                 "turns": [
                     {
                         "turn_number": t.turn_number, "input_method": t.input_method, "query_text": t.query_text,
-                        "retrieved_chunk_ids": t.retrieved_chunk_ids, "response_text": t.response_text,
+                        "retrieved_chunk_ids": t.retrieved_chunk_ids, "retrieved_chunks": t.retrieved_chunks or [],
+                        "response_text": t.response_text,
                         "in_scope": t.in_scope, "latency_ms": t.latency_ms, "timestamp": t.timestamp.isoformat(),
                     }
                     for t in turns_by_session.get(s.session_id, [])
@@ -221,7 +233,7 @@ def export_all_sessions(
     writer.writerow([
         "session_id", "participant_id", "platform", "condition", "product_slug", "start_time", "end_time",
         "total_turns", "errors_logged", "turn_number", "input_method", "query_text", "retrieved_chunk_ids",
-        "response_text", "in_scope", "latency_ms", "timestamp",
+        "retrieved_sections", "retrieved_chunks_json", "response_text", "in_scope", "latency_ms", "timestamp",
     ])
     for s in sessions:
         slug = product_slug_for(s.product_id)
@@ -230,14 +242,15 @@ def export_all_sessions(
             writer.writerow([
                 s.session_id, s.participant_id, s.platform, s.condition, slug,
                 s.start_time.isoformat(), s.end_time.isoformat() if s.end_time else "",
-                s.total_turns, s.errors_logged, "", "", "", "", "", "", "", "",
+                s.total_turns, s.errors_logged, "", "", "", "", "", "", "", "", "", "",
             ])
         for t in turns:
             writer.writerow([
                 s.session_id, s.participant_id, s.platform, s.condition, slug,
                 s.start_time.isoformat(), s.end_time.isoformat() if s.end_time else "",
                 s.total_turns, s.errors_logged, t.turn_number, t.input_method, t.query_text,
-                "|".join(t.retrieved_chunk_ids), t.response_text, t.in_scope, t.latency_ms, t.timestamp.isoformat(),
+                "|".join(t.retrieved_chunk_ids), chunk_sections(t), chunk_json(t), t.response_text, t.in_scope,
+                t.latency_ms, t.timestamp.isoformat(),
             ])
     buf.seek(0)
     return StreamingResponse(

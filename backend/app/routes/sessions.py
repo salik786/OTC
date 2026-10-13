@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -102,13 +103,16 @@ def export_session(session_id: str, db: DBSession = Depends(get_db)) -> Streamin
     writer.writerow(["-- turns --"])
     writer.writerow([
         "session_id", "participant_id", "platform", "turn_number", "input_method", "query_text",
-        "retrieved_chunk_ids", "response_text", "in_scope", "latency_ms", "timestamp",
+        "retrieved_chunk_ids", "retrieved_sections", "retrieved_chunks_json", "response_text", "in_scope",
+        "latency_ms", "timestamp",
     ])
     for t in turns:
         writer.writerow([
             session.session_id, session.participant_id, session.platform, t.turn_number, t.input_method,
-            t.query_text, "|".join(t.retrieved_chunk_ids), t.response_text, t.in_scope, t.latency_ms,
-            t.timestamp.isoformat(),
+            t.query_text, "|".join(t.retrieved_chunk_ids),
+            " | ".join(f"{c.get('section_label')} ({c.get('score', 0):.2f})" for c in (t.retrieved_chunks or [])),
+            json.dumps(t.retrieved_chunks or [], ensure_ascii=False),
+            t.response_text, t.in_scope, t.latency_ms, t.timestamp.isoformat(),
         ])
 
     buf.seek(0)

@@ -69,11 +69,22 @@ export interface SessionSummary {
   errors_logged: number;
 }
 
+export interface RetrievedChunkLog {
+  rank: number;
+  chunk_id: string;
+  section_label: string | null;
+  score: number;
+  text: string;
+  document_id: string | null;
+  document_filename: string | null;
+}
+
 export interface Turn {
   turn_number: number;
   input_method: string;
   query_text: string;
   retrieved_chunk_ids: string[];
+  retrieved_chunks: RetrievedChunkLog[];
   response_text: string;
   in_scope: boolean;
   latency_ms: number;

@@ -112,6 +112,12 @@ class Turn(Base):
     input_method: Mapped[str] = mapped_column(String)  # voice | typed
     query_text: Mapped[str] = mapped_column(Text)
     retrieved_chunk_ids: Mapped[list] = mapped_column(JSON, default=list)
+    # Full snapshot of what retrieval returned for this turn: [{rank, chunk_id, section_label, score,
+    # text, document_id, document_filename}]. The chunk ids above stop resolving the moment a leaflet
+    # is replaced (re-ingest deletes the old Chunk rows), so the text actually shown to the model is
+    # stored here, on the turn, to keep the research record self-contained. NULL on turns logged
+    # before this column existed (that text can't be recovered).
+    retrieved_chunks: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     response_text: Mapped[str] = mapped_column(Text)
     in_scope: Mapped[bool] = mapped_column(Boolean)
     latency_ms: Mapped[float] = mapped_column(Float)

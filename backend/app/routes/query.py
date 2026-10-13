@@ -32,6 +32,22 @@ def _next_turn_number(db: DBSession, session_id: str) -> int:
 _HISTORY_TURNS = 4
 
 
+def _chunk_snapshot(chunks: list[dict]) -> list[dict]:
+    """What gets stored on the Turn row: the exact retrieved text (not just ids), best first."""
+    return [
+        {
+            "rank": i,
+            "chunk_id": c["chunk_id"],
+            "section_label": c["section_label"],
+            "score": float(c["score"]),
+            "text": c["text"],
+            "document_id": c.get("document_id"),
+            "document_filename": c.get("document_filename"),
+        }
+        for i, c in enumerate(chunks, start=1)
+    ]
+
+
 def _recent_history(db: DBSession, session_id: str) -> list[dict]:
     """Last few turns (oldest first) so the model can resolve conversational follow-ups like
     "what do you mean by that" - without this, every turn was answered with zero memory of what
@@ -69,6 +85,7 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
         input_method=req.input_method,
         query_text=req.query_text,
         retrieved_chunk_ids=[c["chunk_id"] for c in chunks],
+        retrieved_chunks=_chunk_snapshot(chunks),
         response_text=answer_text,
         in_scope=in_scope,
         latency_ms=latency_ms,
@@ -106,6 +123,7 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
     query_text = req.query_text
     input_method = req.input_method
     chunk_ids = [c["chunk_id"] for c in chunks]
+    chunk_snapshot = _chunk_snapshot(chunks)
 
     def event_stream():
         start = time.perf_counter()
@@ -127,6 +145,7 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
                 input_method=input_method,
                 query_text=query_text,
                 retrieved_chunk_ids=chunk_ids,
+                retrieved_chunks=chunk_snapshot,
                 response_text=answer_text,
                 in_scope=in_scope,
                 latency_ms=latency_ms,
@@ -172,6 +191,7 @@ def core_info(session_id: str, db: DBSession = Depends(get_db)) -> CoreInfoRespo
         input_method="system",
         query_text=query_text,
         retrieved_chunk_ids=[c["chunk_id"] for c in chunks],
+        retrieved_chunks=_chunk_snapshot(chunks),
         response_text=data.get("full_text", ""),
         in_scope=True,
         latency_ms=latency_ms,
