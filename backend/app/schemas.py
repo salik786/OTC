@@ -112,7 +112,7 @@ class DocumentChunkOut(BaseModel):
 class TestRetrievalRequest(BaseModel):
     query: str
     product_slug: str
-    top_k: int = 5
+    top_k: int | None = None  # None = the active config's top_k
 
 
 class TestRetrievalResponse(BaseModel):
@@ -151,6 +151,7 @@ class TurnOut(BaseModel):
     query_text: str
     retrieved_chunk_ids: list[str]
     retrieved_chunks: list[RetrievedChunkLog] = []
+    config_version: int | None = None
     response_text: str
     in_scope: bool
     latency_ms: float

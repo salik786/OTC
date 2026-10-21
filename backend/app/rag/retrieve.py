@@ -2,15 +2,17 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import Chunk, Document
+from app.rag.config_store import get_active_config
 from app.rag.vectorstore import get_vectorstore
 
 settings = get_settings()
 
 
-def retrieve(db: Session, query_text: str, product_id: str, top_k: int | None = None) -> list[dict]:
+def retrieve(db: Session, query_text: str, product_id: str, top_k: int | None = None, cfg=None) -> list[dict]:
     """Returns retrieved chunks as dicts: {chunk_id, text, section_label, score, document_id,
     document_filename}, best first."""
-    top_k = top_k or settings.retrieval_top_k
+    if top_k is None:
+        top_k = (cfg.config if hasattr(cfg, 'config') else cfg or get_active_config().config)['top_k']
     hits = get_vectorstore().search(query_text, product_id, top_k)
     if not hits:
         return []

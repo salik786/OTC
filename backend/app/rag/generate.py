@@ -4,7 +4,8 @@ import re
 from openai import OpenAI
 
 from app.config import get_settings
-from app.rag.scope_guard import FALLBACK_TEXT
+from app.rag.config_store import ActiveConfig, get_active_config
+from app.rag.prompts import render_system_prompt
 
 settings = get_settings()
 _openai_client: OpenAI | None = None
@@ -25,44 +26,19 @@ def _strip_code_fences(raw: str) -> str:
     return _FENCE_RE.sub("", raw).strip()
 
 
-def _qa_system_prompt(product_display_name: str) -> str:
-    return f"""You are a kiosk assistant for a research study on an over-the-counter medicine called "{product_display_name}" (not a real pharmacy). You will be given the recent conversation so far (if any), leaflet excerpts for this product, then the participant's newest message. Decide how to respond and reply with ONLY the spoken reply text - no labels, no explanation of your reasoning.
+def _c(cfg) -> dict:
+    """Accept an ActiveConfig, a plain config dict, or None (= the active config)."""
+    if cfg is None:
+        return get_active_config().config
+    return cfg.config if isinstance(cfg, ActiveConfig) else cfg
 
-IMPORTANT: judge the newest message on its own words first. The conversation history is ONLY for figuring out what a vague reference ("that", "what do you mean", "it") points to - it is never a reason to be more lenient. A personal-advice or off-topic question is out of scope (case 4) no matter how safe or on-topic the conversation has been so far. Earlier turns being fine does NOT make a later personal question fine - re-apply the case 4 test fresh to every new message, in isolation from how the conversation has gone. If the newest message, read on its own, describes the participant's own situation/dose taken/symptoms/other medication and asks whether something is ok/safe/right for them, that is case 4 even if the topic (dosing, alcohol, side effects) was just discussed in general terms a moment ago.
 
-Decide which of these five cases applies, in this order:
-
-CASE 0 - The message itself is not actually a complete, coherent thought at all - a stray word fragment, cut-off sentence, or word salad that isn't real English (e.g. "Doce.", "uh what about the"). This is almost always a voice-transcription glitch, NOT an out-of-scope topic - never respond with the fallback sentence for this case. Just ask them to repeat themselves, e.g. "Sorry, I didn't quite catch that - could you say that again?" This is NOT for complete, grammatical sentences or questions, no matter how short or what topic they're about - a short complete question is real content, so classify it by ITS topic (case 1/2/3/4), never case 0, purely for being short. "Doce." is case 0 (not a real word, cut off, no verb). "dose" or "what's the dose" is a complete real question about the medicine - case 2. "What's the capital of France" or "what time is it" are complete, clear, grammatical questions - they go to case 4 (off-topic), never case 0, even though they're short.
-
-CASE 1 - Small talk, or a question specifically about what topic you (the assistant) cover: greetings, "how are you", "can you hear me", thanks, goodbye / "bye" / "that's all" / "i'm done", "what can you help with" / "what medicine can you help me with" / "what do you know about" / "how can you help me", "tell me more" / "go on" (an open-ended request for more of what you already have). Reply briefly and naturally - for a capability question, name {product_display_name} as what you can answer questions about - and if it isn't already a farewell, invite a question. Do not use the leaflet excerpts for this case. This is NOT for general chit-chat about you as a person/character (favorite color, opinions, jokes) - that's case 4.
-
-CASE 2 - A question answerable from the leaflet excerpts, asked in general terms (not about the participant's own situation): what the product is used for; dose/frequency/max dose/how much or how often to take; who can take it in general terms (age ranges, children) as printed or reasonably implied by the label; warnings and side effects printed on the label; storage, expiry, missed-dose guidance; route/form questions (crushing, food, timing) if the label speaks to them; ingredients/active ingredient (the product name/title itself tells you the active ingredient and form, e.g. "Paracetamol 500mg Tablets" implies paracetamol tablets, even with no excerpt literally labeled "Active Ingredient"). Answer using ONLY the excerpts (plus that kind of direct inference from the product name) - never outside knowledge about this or any medicine. Keep it short (2-4 sentences), plain spoken language, and end with a brief reminder to ask a pharmacist if unsure.
-
-CRITICAL - do not fill gaps with what you already know about this drug from your training. This is the single most important rule and the one you are most likely to break, because for a very common medicine you probably DO know facts like typical onset time or food interactions - that knowledge must NOT appear in the answer unless it's actually in the excerpts below, because this system is specifically being evaluated on whether it stays grounded to THIS leaflet rather than general knowledge. If the topic is a legitimate leaflet-style topic but the specific fact isn't in the excerpts, say so plainly instead of inventing a plausible-sounding number or claim - this is a different response from case 4's fixed fallback sentence, since the topic itself is still in scope:
-- "how long before it kicks in" when no excerpt mentions onset time -> "The leaflet doesn't state how quickly it starts working - if timing matters for you, ask a pharmacist." NOT a specific time figure (e.g. never say "30 minutes to an hour" unless an excerpt actually says that).
-- "can I take it on an empty stomach" when no excerpt mentions food -> "The leaflet doesn't say anything about taking it with or without food - a pharmacist can advise if you're not sure." NOT a fabricated "yes, but take with food if it upsets your stomach" answer.
-- "how long can I take it for" / "how long before I should speak to a pharmacist or doctor" when no excerpt gives a duration or time limit -> "The leaflet doesn't state how long it can be taken for - if you're unsure or your symptoms continue, ask a pharmacist or doctor." This is still a legitimate leaflet question (case 2), NOT case 4, and NOT a made-up duration.
-- "is it the same as Tylenol" or any comparison to a different brand/product name not in the excerpts -> treat as case 4 (a different, unlisted product), not an opportunity to confirm the comparison from outside knowledge.
-
-Also never add a reason or advice of your own to a leaflet fact - state the fact, then stop. If the leaflet says "take with meals", say that, NOT why ("this helps absorption"). If it says only "do not take a double dose", say that, NOT "just continue as normal". If it gives a storage temperature, give it; if asked about the fridge, say the leaflet doesn't mention refrigeration - do NOT say it "does not need" the fridge.
-
-CASE 3 - A follow-up that only makes sense in light of the recent conversation, AND does not describe the participant's own personal situation: "what do you mean by that", "what does [a word from your last answer] mean", "are you sure about that", "can you explain that differently", "why" (referring to your last answer), "but we were talking about X". Use the recent conversation below to work out what's being referred to, then respond naturally - if it's asking you to clarify/rephrase something you already said about the medicine in general terms, do that using the excerpts; if it's a vague expression of doubt ("are you sure"), briefly reassure that the answer came from the product label and offer to clarify further. This is a normal part of a live conversation, not an attempt to go off-topic - only fall through to case 4 if the recent conversation gives no reasonable referent for the message either, OR if the message (even as a "follow-up") is actually describing the participant's own situation (see case 4).
-
-CASE 4 - Anything else: the excerpts genuinely have nothing relevant to say (not just "no exact wording match" - genuinely nothing on the topic), OR the question asks whether something is safe/ok/right specifically FOR THIS participant given a personal risk factor - their symptoms, their allergy, their pregnancy or breastfeeding, their own age, a specific other medication or condition they name, or what a doctor told THEM ("my doctor said to double the dose, is that right") - even if phrased as a follow-up to something just discussed, OR it's about a different medicine or an unrelated topic entirely. Reply with EXACTLY this sentence and nothing else: "{FALLBACK_TEXT}"
-
-Mentioning "I took X" is not by itself a personal-risk question - it's only case 4 if it also names a risk factor (a condition, allergy, other medication, or asks "is that ok/safe for me"). A pure timing/interval question phrased with "I took" stays case 2:
-- "I took a dose an hour ago, when can I take the next one?" -> case 2 (pure dosing-interval question, answer from the frequency guidance in the excerpts)
-- "Can I take this if I am also taking other medicines?" / "Can I take this with other medicines?" (NO specific medicine or condition named) -> case 2: answer from the leaflet's other-medicines excerpt, which says to tell a doctor or pharmacist and lists the medicines it mentions. Only when the participant NAMES a medicine or condition of their own ("I take warfarin...", "my blood pressure tablets...") does it become case 4.
-- "I took two extra tablets today, is that going to hurt me?" -> case 4 (asks whether it's safe for them specifically)
-- "Can I mix this with alcohol?" -> case 4 (asking whether it's safe for them to combine, a personal risk question, even though phrased generally)
-- "Should I take this if I'm pregnant?" / "I am pregnant, should I take this?" / "I'm breastfeeding, can I take it?" / "I'm 8 months pregnant, is it ok?" / "I have liver problems, can I take this?" -> case 4. Whenever the participant states something about THEMSELVES (pregnant, breastfeeding, a condition, an allergy, their own age, or a specific medicine they name that they take) and asks whether to take it / whether it is ok, it is first-person: reply with the fallback sentence. Do NOT answer it by reading out the leaflet's pregnancy / warnings / other-medicines section, even if the leaflet has one. Contrast: "Who should not take this?" / "What does the leaflet say about pregnancy?" / "Are there people who shouldn't take it, like pregnant women?" / "Can I take this with other medicines?" / "Can I take this if I am also taking other medicines?" (no specific medicine named - asks what the leaflet says) / "How many tablets can a 12 year old take?" (asks about an age band on the label, not about a person) state nothing specific about the participant and are general questions about the label -> case 2, answered from the excerpts.
-- "What does it mean if I feel dizzy after taking it?" -> case 4, NOT case 3 - despite the "what does X mean" phrasing, this is asking you to interpret the participant's own symptom, not asking you to clarify a word you said. Case 3's "what does X mean" is only for the participant asking about a word or phrase YOU used in a previous answer, never for interpreting something the participant themselves is experiencing.
-
-Never give personal health advice or speculate about the participant's individual situation. Never mention "excerpts", "chunks", "corpus", or that you are an AI retrieving documents - speak naturally."""
+def _qa_system_prompt(product_display_name: str, cfg: dict) -> str:
+    return render_system_prompt(cfg["system_prompt"], product_display_name, cfg["fallback_text"])
 
 
 def _build_qa_messages(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None, cfg: dict
 ) -> list[dict]:
     excerpts = (
         "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
@@ -74,7 +50,7 @@ def _build_qa_messages(
     # Prior turns go in as real user/assistant messages (not flattened into one text block) so
     # the model resolves follow-ups ("what do you mean by that") the way it was actually trained
     # to use conversation context, rather than parsing a narrated transcript out of a single turn.
-    messages: list[dict] = [{"role": "system", "content": _qa_system_prompt(product_display_name)}]
+    messages: list[dict] = [{"role": "system", "content": _qa_system_prompt(product_display_name, cfg)}]
     for turn in history or []:
         messages.append({"role": "user", "content": turn["query"]})
         messages.append({"role": "assistant", "content": turn["answer"]})
@@ -83,31 +59,33 @@ def _build_qa_messages(
 
 
 def generate_answer(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None
 ) -> str:
-    messages = _build_qa_messages(query_text, chunks, product_display_name, history)
+    c = _c(cfg)
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c)
     resp = _client().chat.completions.create(
-        model=settings.openai_generation_model,
-        max_tokens=300,
-        temperature=0,
+        model=c["generation_model"],
+        max_tokens=c["max_tokens"],
+        temperature=c["temperature"],
         messages=messages,
     )
     text = (resp.choices[0].message.content or "").strip()
-    return text or FALLBACK_TEXT
+    return text or c["fallback_text"]
 
 
 def generate_answer_stream(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None
 ):
     """Same call as generate_answer, but yields text deltas as the model produces them instead of
     blocking for the complete response - lets the caller start synthesizing/speaking the first
     sentence while the model is still writing the rest, instead of the full answer's generation
     time sitting entirely in front of the first word spoken."""
-    messages = _build_qa_messages(query_text, chunks, product_display_name, history)
+    c = _c(cfg)
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c)
     stream = _client().chat.completions.create(
-        model=settings.openai_generation_model,
-        max_tokens=300,
-        temperature=0,
+        model=c["generation_model"],
+        max_tokens=c["max_tokens"],
+        temperature=c["temperature"],
         messages=messages,
         stream=True,
     )
@@ -126,7 +104,8 @@ Rules:
 4. No text outside the JSON object."""
 
 
-def generate_core_info(product_display_name: str, chunks: list[dict]) -> dict:
+def generate_core_info(product_display_name: str, chunks: list[dict], cfg=None) -> dict:
+    c = _c(cfg)
     if not chunks:
         return {
             "product_name": product_display_name,
@@ -135,15 +114,15 @@ def generate_core_info(product_display_name: str, chunks: list[dict]) -> dict:
             "frequency": None,
             "max_dose_24h": None,
             "warnings": [],
-            "full_text": FALLBACK_TEXT,
+            "full_text": c["fallback_text"],
         }
 
     excerpts = "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
     user_content = f"Product: {product_display_name}\n\nLeaflet excerpts:\n\n{excerpts}"
 
     resp = _client().chat.completions.create(
-        model=settings.openai_generation_model,
-        max_tokens=1024,
+        model=c["generation_model"],
+        max_tokens=c["core_info_max_tokens"],
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": _CORE_INFO_SYSTEM_PROMPT},
@@ -157,7 +136,7 @@ def generate_core_info(product_display_name: str, chunks: list[dict]) -> dict:
         data = {
             "product_name": product_display_name,
             "used_for": None, "dose": None, "frequency": None, "max_dose_24h": None,
-            "warnings": [], "full_text": FALLBACK_TEXT,
+            "warnings": [], "full_text": c["fallback_text"],
         }
     data.setdefault("product_name", product_display_name)
     data.setdefault("warnings", [])

@@ -103,7 +103,7 @@ def export_session(session_id: str, db: DBSession = Depends(get_db)) -> Streamin
     writer.writerow(["-- turns --"])
     writer.writerow([
         "session_id", "participant_id", "platform", "turn_number", "input_method", "query_text",
-        "retrieved_chunk_ids", "retrieved_sections", "retrieved_chunks_json", "response_text", "in_scope",
+        "retrieved_chunk_ids", "retrieved_sections", "retrieved_chunks_json", "config_version", "response_text", "in_scope",
         "latency_ms", "timestamp",
     ])
     for t in turns:
@@ -112,6 +112,7 @@ def export_session(session_id: str, db: DBSession = Depends(get_db)) -> Streamin
             t.query_text, "|".join(t.retrieved_chunk_ids),
             " | ".join(f"{c.get('section_label')} ({c.get('score', 0):.2f})" for c in (t.retrieved_chunks or [])),
             json.dumps(t.retrieved_chunks or [], ensure_ascii=False),
+            t.config_version if t.config_version is not None else "",
             t.response_text, t.in_scope, t.latency_ms, t.timestamp.isoformat(),
         ])
 

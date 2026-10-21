@@ -29,14 +29,25 @@ def init_db() -> None:
     _add_missing_columns()
 
 
+# Columns added after a database may already exist (create_all never alters existing tables and this
+# project has no migration tool). Each entry: (table, column, SQL type + default).
+_ADDED_COLUMNS = [
+    ("turns", "retrieved_chunks", "JSON"),
+    ("turns", "config_version", "INTEGER"),
+    ("documents", "source_text", "TEXT"),
+    ("documents", "source_reconstructed", "BOOLEAN DEFAULT 0"),
+]
+
+
 def _add_missing_columns() -> None:
-    """create_all only creates missing TABLES - it never adds a column to one that already exists,
-    and this project has no migration tool. So any column added after a database was first created
-    (e.g. production's) is added here, idempotently and as nullable, before anything queries it."""
-    existing = {c["name"] for c in inspect(engine).get_columns("turns")}
-    if "retrieved_chunks" not in existing:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE turns ADD COLUMN retrieved_chunks JSON"))
+    """Idempotently ALTER TABLE ... ADD COLUMN for anything in _ADDED_COLUMNS that's missing, before
+    anything queries it. All additions are nullable/defaulted so existing rows stay valid."""
+    insp = inspect(engine)
+    for table, column, ddl in _ADDED_COLUMNS:
+        existing = {c["name"] for c in insp.get_columns(table)}
+        if column not in existing:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
 
 def get_db() -> Generator[Session, None, None]:

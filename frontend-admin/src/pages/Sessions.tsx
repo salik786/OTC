@@ -274,7 +274,8 @@ export function Sessions() {
                       </span>
                     </strong>
                     <span className="muted">
-                      {t.latency_ms.toFixed(0)}ms · {new Date(t.timestamp).toLocaleTimeString()}
+                      {t.latency_ms.toFixed(0)}ms · {new Date(t.timestamp).toLocaleTimeString()} ·{" "}
+                      {t.config_version != null ? `config v${t.config_version}` : "pre-versioning"}
                     </span>
                   </div>
                   <p>

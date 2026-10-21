@@ -10,8 +10,9 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.db.models import Document, Product
 from app.db.session import SessionLocal, init_db
-from app.rag.ingest import ingest_document
-from app.routes import admin, query, sessions, voice
+from app.rag.config_store import ensure_initial_version
+from app.rag.ingest import backfill_source_text, ingest_document
+from app.routes import admin, admin_settings, query, sessions, voice
 from app.routes.admin import limiter
 
 logger = logging.getLogger("otc.startup")
@@ -68,11 +69,23 @@ def _seed_corpus() -> None:
         db.close()
 
 
+def _init_rag_config() -> None:
+    """Seed RAG config version 1 (from the built-in defaults) on a database with none, and store the
+    source text for any leaflet ingested before that column existed (needed to re-chunk later)."""
+    db = SessionLocal()
+    try:
+        ensure_initial_version(db)
+        backfill_source_text(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     _seed_products()
     _seed_corpus()
+    _init_rag_config()
     yield
 
 
@@ -92,6 +105,7 @@ app.include_router(sessions.router)
 app.include_router(query.router)
 app.include_router(voice.router)
 app.include_router(admin.router)
+app.include_router(admin_settings.router)
 
 
 @app.get("/api/health")

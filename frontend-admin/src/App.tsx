@@ -4,8 +4,9 @@ import { Login } from "./pages/Login";
 import { Documents } from "./pages/Documents";
 import { TestRetrieval } from "./pages/TestRetrieval";
 import { Sessions } from "./pages/Sessions";
+import { Settings } from "./pages/Settings";
 
-type Tab = "documents" | "retrieval" | "sessions";
+type Tab = "documents" | "retrieval" | "sessions" | "settings";
 
 function AdminShell() {
   const { logout } = useAuth();
@@ -29,11 +30,15 @@ function AdminShell() {
         <button className={tab === "sessions" ? "active" : ""} onClick={() => setTab("sessions")}>
           Sessions
         </button>
+        <button className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}>
+          RAG Settings
+        </button>
       </nav>
       <main>
         {tab === "documents" && <Documents />}
         {tab === "retrieval" && <TestRetrieval />}
         {tab === "sessions" && <Sessions />}
+        {tab === "settings" && <Settings />}
       </main>
     </div>
   );

@@ -270,3 +270,53 @@ td {
   padding-left: 10px;
   margin-top: 6px;
 }
+
+.banner {
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.banner-warn {
+  background: #fdf3e1;
+  border: 1px solid #e6c98a;
+}
+
+.setting-row {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.6rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-changed {
+  background: #f6f9ff;
+  border-left: 3px solid #5b84c4;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 3px;
+  background: #eee;
+  color: #555;
+  vertical-align: middle;
+}
+
+.tag-changed {
+  background: #dfe9fb;
+  color: #2a4f8f;
+}
+
+.tag-live {
+  background: #dff1e6;
+  color: #1f6b46;
+}

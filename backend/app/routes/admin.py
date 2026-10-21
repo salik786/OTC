@@ -91,7 +91,7 @@ def test_retrieval(req: TestRetrievalRequest, db: DBSession = Depends(get_db)) -
         raise HTTPException(status_code=404, detail=f"unknown product_slug '{req.product_slug}'")
 
     start = time.perf_counter()
-    chunks = retrieve(db, req.query, product_id=product.id, top_k=req.top_k)
+    chunks = retrieve(db, req.query, product_id=product.id, top_k=req.top_k)  # None -> active config's top_k
     latency_ms = (time.perf_counter() - start) * 1000
 
     return TestRetrievalResponse(
@@ -156,7 +156,7 @@ def get_session_turns(session_id: str, db: DBSession = Depends(get_db)) -> list[
         TurnOut(
             turn_number=t.turn_number, input_method=t.input_method, query_text=t.query_text,
             retrieved_chunk_ids=t.retrieved_chunk_ids, retrieved_chunks=t.retrieved_chunks or [],
-            response_text=t.response_text,
+            config_version=t.config_version, response_text=t.response_text,
             in_scope=t.in_scope, latency_ms=t.latency_ms, timestamp=t.timestamp,
         )
         for t in turns
@@ -215,7 +215,7 @@ def export_all_sessions(
                     {
                         "turn_number": t.turn_number, "input_method": t.input_method, "query_text": t.query_text,
                         "retrieved_chunk_ids": t.retrieved_chunk_ids, "retrieved_chunks": t.retrieved_chunks or [],
-                        "response_text": t.response_text,
+                        "config_version": t.config_version, "response_text": t.response_text,
                         "in_scope": t.in_scope, "latency_ms": t.latency_ms, "timestamp": t.timestamp.isoformat(),
                     }
                     for t in turns_by_session.get(s.session_id, [])
@@ -233,7 +233,8 @@ def export_all_sessions(
     writer.writerow([
         "session_id", "participant_id", "platform", "condition", "product_slug", "start_time", "end_time",
         "total_turns", "errors_logged", "turn_number", "input_method", "query_text", "retrieved_chunk_ids",
-        "retrieved_sections", "retrieved_chunks_json", "response_text", "in_scope", "latency_ms", "timestamp",
+        "retrieved_sections", "retrieved_chunks_json", "config_version", "response_text", "in_scope", "latency_ms",
+        "timestamp",
     ])
     for s in sessions:
         slug = product_slug_for(s.product_id)
@@ -242,14 +243,14 @@ def export_all_sessions(
             writer.writerow([
                 s.session_id, s.participant_id, s.platform, s.condition, slug,
                 s.start_time.isoformat(), s.end_time.isoformat() if s.end_time else "",
-                s.total_turns, s.errors_logged, "", "", "", "", "", "", "", "", "", "",
+                s.total_turns, s.errors_logged, "", "", "", "", "", "", "", "", "", "", "",
             ])
         for t in turns:
             writer.writerow([
                 s.session_id, s.participant_id, s.platform, s.condition, slug,
                 s.start_time.isoformat(), s.end_time.isoformat() if s.end_time else "",
                 s.total_turns, s.errors_logged, t.turn_number, t.input_method, t.query_text,
-                "|".join(t.retrieved_chunk_ids), chunk_sections(t), chunk_json(t), t.response_text, t.in_scope,
+                "|".join(t.retrieved_chunk_ids), chunk_sections(t), chunk_json(t), t.config_version if t.config_version is not None else "", t.response_text, t.in_scope,
                 t.latency_ms, t.timestamp.isoformat(),
             ])
     buf.seek(0)

@@ -9,7 +9,7 @@ from app.db.models import Product, SessionRecord, Turn
 from app.db.session import SessionLocal, get_db
 from app.rag.generate import generate_answer, generate_answer_stream, generate_core_info
 from app.rag.retrieve import retrieve
-from app.rag.scope_guard import FALLBACK_TEXT
+from app.rag.config_store import get_active_config
 from app.schemas import CoreInfoResponse, QueryRequest, QueryResponse, RetrievedChunk
 
 router = APIRouter(prefix="/api", tags=["query"])
@@ -29,8 +29,6 @@ def _next_turn_number(db: DBSession, session_id: str) -> int:
     return count + 1
 
 
-_HISTORY_TURNS = 4
-
 
 def _chunk_snapshot(chunks: list[dict]) -> list[dict]:
     """What gets stored on the Turn row: the exact retrieved text (not just ids), best first."""
@@ -48,7 +46,7 @@ def _chunk_snapshot(chunks: list[dict]) -> list[dict]:
     ]
 
 
-def _recent_history(db: DBSession, session_id: str) -> list[dict]:
+def _recent_history(db: DBSession, session_id: str, turns_to_include: int) -> list[dict]:
     """Last few turns (oldest first) so the model can resolve conversational follow-ups like
     "what do you mean by that" - without this, every turn was answered with zero memory of what
     was just said, so any reference back to a prior answer looked like an unanswerable non-sequitur
@@ -57,10 +55,10 @@ def _recent_history(db: DBSession, session_id: str) -> list[dict]:
         db.query(Turn)
         .filter(Turn.session_id == session_id)
         .order_by(Turn.turn_number.desc())
-        .limit(_HISTORY_TURNS)
+        .limit(turns_to_include)
         .all()
     )
-    return [{"query": t.query_text, "answer": t.response_text} for t in reversed(turns)]
+    return [{"query": t.query_text, "answer": t.response_text} for t in reversed(turns)] if turns_to_include > 0 else []
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -70,12 +68,13 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     product = db.query(Product).filter(Product.id == session.product_id).first()
     product_display_name = product.display_name if product else "this medicine"
 
+    cfg = get_active_config(db)  # one snapshot for the whole request
     start = time.perf_counter()
-    history = _recent_history(db, session.session_id)
-    chunks = retrieve(db, req.query_text, product_id=session.product_id)
-    answer_text = generate_answer(req.query_text, chunks, product_display_name, history)
+    history = _recent_history(db, session.session_id, cfg["history_turns"])
+    chunks = retrieve(db, req.query_text, product_id=session.product_id, cfg=cfg)
+    answer_text = generate_answer(req.query_text, chunks, product_display_name, history, cfg)
     # The logged in_scope flag reflects whether the fixed deflection text was actually shown.
-    in_scope = answer_text.strip() != FALLBACK_TEXT
+    in_scope = answer_text.strip() != cfg["fallback_text"]
     latency_ms = (time.perf_counter() - start) * 1000
 
     turn_number = _next_turn_number(db, session.session_id)
@@ -86,6 +85,7 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
         query_text=req.query_text,
         retrieved_chunk_ids=[c["chunk_id"] for c in chunks],
         retrieved_chunks=_chunk_snapshot(chunks),
+        config_version=cfg.version,
         response_text=answer_text,
         in_scope=in_scope,
         latency_ms=latency_ms,
@@ -117,8 +117,9 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
     session = _get_session_or_404(db, req.session_id)
     product = db.query(Product).filter(Product.id == session.product_id).first()
     product_display_name = product.display_name if product else "this medicine"
-    history = _recent_history(db, session.session_id)
-    chunks = retrieve(db, req.query_text, product_id=session.product_id)
+    cfg = get_active_config(db)  # one snapshot for the whole request, including the streamed generation
+    history = _recent_history(db, session.session_id, cfg["history_turns"])
+    chunks = retrieve(db, req.query_text, product_id=session.product_id, cfg=cfg)
     session_id = session.session_id
     query_text = req.query_text
     input_method = req.input_method
@@ -128,12 +129,12 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
     def event_stream():
         start = time.perf_counter()
         parts: list[str] = []
-        for delta in generate_answer_stream(query_text, chunks, product_display_name, history):
+        for delta in generate_answer_stream(query_text, chunks, product_display_name, history, cfg):
             parts.append(delta)
             yield json.dumps({"delta": delta}) + "\n"
 
-        answer_text = "".join(parts).strip() or FALLBACK_TEXT
-        in_scope = answer_text != FALLBACK_TEXT
+        answer_text = "".join(parts).strip() or cfg["fallback_text"]
+        in_scope = answer_text != cfg["fallback_text"]
         latency_ms = (time.perf_counter() - start) * 1000
 
         write_db = SessionLocal()
@@ -146,6 +147,7 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
                 query_text=query_text,
                 retrieved_chunk_ids=chunk_ids,
                 retrieved_chunks=chunk_snapshot,
+                config_version=cfg.version,
                 response_text=answer_text,
                 in_scope=in_scope,
                 latency_ms=latency_ms,
@@ -179,8 +181,9 @@ def core_info(session_id: str, db: DBSession = Depends(get_db)) -> CoreInfoRespo
 
     start = time.perf_counter()
     query_text = f"What is {product.display_name} used for, the dose, frequency, max dose, and warnings?"
-    chunks = retrieve(db, query_text, product_id=session.product_id, top_k=8)
-    data = generate_core_info(product.display_name, chunks)
+    cfg = get_active_config(db)
+    chunks = retrieve(db, query_text, product_id=session.product_id, top_k=cfg["core_info_top_k"], cfg=cfg)
+    data = generate_core_info(product.display_name, chunks, cfg)
     latency_ms = (time.perf_counter() - start) * 1000
     data["latency_ms"] = latency_ms
 
@@ -192,6 +195,7 @@ def core_info(session_id: str, db: DBSession = Depends(get_db)) -> CoreInfoRespo
         query_text=query_text,
         retrieved_chunk_ids=[c["chunk_id"] for c in chunks],
         retrieved_chunks=_chunk_snapshot(chunks),
+        config_version=cfg.version,
         response_text=data.get("full_text", ""),
         in_scope=True,
         latency_ms=latency_ms,

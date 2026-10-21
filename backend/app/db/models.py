@@ -64,6 +64,12 @@ class Document(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # The full extracted leaflet text, kept so chunking/embedding settings can be changed later and
+    # the leaflet re-chunked without a re-upload. NULL only transiently (backfilled at startup).
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # True when source_text was rebuilt from the stored chunks (documents ingested before this
+    # column existed) rather than taken from the original file - re-chunking it is approximate.
+    source_reconstructed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     product: Mapped["Product"] = relationship(back_populates="documents")
     chunks: Mapped[list["Chunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
@@ -117,6 +123,9 @@ class Turn(Base):
     # is replaced (re-ingest deletes the old Chunk rows), so the text actually shown to the model is
     # stored here, on the turn, to keep the research record self-contained. NULL on turns logged
     # before this column existed (that text can't be recovered).
+    # RagConfigVersion.version that was active when this turn was answered (NULL = logged before
+    # configuration versioning existed).
+    config_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     retrieved_chunks: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     response_text: Mapped[str] = mapped_column(Text)
     in_scope: Mapped[bool] = mapped_column(Boolean)
@@ -124,3 +133,20 @@ class Turn(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     session: Mapped["SessionRecord"] = relationship(back_populates="turns")
+
+
+class RagConfigVersion(Base):
+    """One saved snapshot of the RAG configuration. Rows are never edited - every change inserts a
+    new row with the next version number, so any turn's `config_version` can always be traced back to
+    the exact settings (including the full system prompt) that produced its answer. Exactly one row
+    is active at a time; restoring an old version re-activates that row rather than copying it."""
+
+    __tablename__ = "rag_config_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    version: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    config: Mapped[dict] = mapped_column(JSON)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
