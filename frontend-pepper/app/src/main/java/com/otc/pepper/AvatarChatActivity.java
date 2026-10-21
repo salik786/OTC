@@ -167,6 +167,13 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         main.setOrientation(LinearLayout.VERTICAL);
         main.setGravity(Gravity.CENTER);
         main.setPadding(0, UiKit.dp(this, 16), 0, UiKit.dp(this, 16));
+        // The orb "breathes" by scaling up to 4% past its own bounds. A parent clips each child to
+        // that child's bounds by default, so the overshoot was being cut off flat on all four
+        // extremes (measured: ~37px flat runs top/bottom/left/right) - the "circle cut at the
+        // sides" bug. clipChildren on the orb's own wrapper (set in UiKit.orb) isn't enough on its
+        // own, because THIS layout was clipping the wrapper itself.
+        main.setClipChildren(false);
+        main.setClipToPadding(false);
 
         orbView = UiKit.orb(this);
         main.addView(orbView, wrapWithMargins(0, 0, 0, UiKit.dp(this, 24)));
@@ -244,11 +251,7 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
 
         main.addView(typedRow, wrapWithMargins(0, UiKit.dp(this, 8), 0, 0));
 
-        android.widget.Button endBtn = UiKit.ghostButton(this, "I'm done - end session");
-        endBtn.setOnClickListener(v -> endSession());
-        main.addView(endBtn, wrapWithMargins(0, UiKit.dp(this, 20), 0, 0));
-
-        // main holds a fixed-size 220dp orb plus status/dock/end-session content - on a screen
+        // main holds a fixed-size 220dp orb plus status/dock content - on a screen
         // shorter than this was originally tested on (the physical Pepper screen is shorter than
         // the dev emulator), that combined WRAP_CONTENT height can exceed what's actually
         // available, and since main itself was never scrollable, the overflow was simply
@@ -262,15 +265,15 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         // mainScroll takes WRAP_CONTENT (its full natural height) first, and transcriptScroll -
         // weighted below - only gets whatever's left over. On a screen short enough that
-        // mainScroll's natural content (the orb, status text, dock, end-session button) already
+        // mainScroll's natural content (the orb, status text, dock) already
         // exceeds the whole screen, that leftover is zero: the transcript becomes reachable in
         // principle (transcriptScroll is still a real ScrollView) but has no visible height to
         // scroll from, i.e. effectively invisible. Giving mainScroll a weight too, alongside
         // transcriptScroll's, means both share the available space proportionally instead of one
         // unconditionally starving the other - each still scrolls internally if its own share
-        // isn't enough for its content. Weighted 3:1 since mainScroll's content (built around a
+        // isn't enough for its content. Weighted 5:1 since mainScroll's content (built around a
         // 220dp orb) is inherently taller than a reasonable minimum for a few lines of transcript.
-        root.addView(mainScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 3f));
+        root.addView(mainScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 5f));
 
         transcriptScroll = new ScrollView(this);
         transcriptContainer = new LinearLayout(this);
@@ -280,6 +283,17 @@ public class AvatarChatActivity extends RobotActivity implements RobotLifecycleC
         transcriptScroll.addView(transcriptContainer, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         root.addView(transcriptScroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // Pinned at the bottom, outside both scrolling regions (same placement as ChatActivity).
+        // It used to sit at the end of the orb section's scrolling content, which on the real
+        // screen is taller than the space that section gets - so the button was always below the
+        // fold and the researcher had no visible way to end the session in voice mode.
+        android.widget.Button endBtn = UiKit.ghostButton(this, "I'm done - end session");
+        endBtn.setOnClickListener(v -> endSession());
+        LinearLayout.LayoutParams endLp = wrap();
+        endLp.gravity = Gravity.CENTER_HORIZONTAL;
+        endLp.topMargin = UiKit.dp(this, 4);
+        root.addView(endBtn, endLp);
 
         return root;
     }

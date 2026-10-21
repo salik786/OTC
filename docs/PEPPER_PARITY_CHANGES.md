@@ -31,6 +31,11 @@ itself. All four fixed in `UiKit.java`, `AvatarChatActivity.java`, `ModeSelectAc
    immediate child with an unspecified height, and that ambiguity cascaded down through
    `MATCH_PARENT` and collapsed the circle to almost nothing. Reverted to a fixed-size inner
    circle, which measures correctly regardless of the surrounding container.)
+   **Correction (found later, see #7):** the narrow-width explanation above was incomplete. The
+   orb was *also* being clipped flat on all four sides at 1280x800, by a different cause - the
+   "breathing" animation scales it up to 4% past its own bounds, and its parent `LinearLayout`
+   clipped that overshoot to the box. `outer.setClipChildren(false)` doesn't help when the *parent*
+   is the one clipping.
 2. **On `AvatarChatActivity`, the orb and everything below the back/MedCheck row could render
    entirely off-screen with no way to reach it.** Root cause: the section holding the orb, status
    text, mic dock, and end-session button was a plain (non-scrolling) `LinearLayout` sized to its
@@ -62,11 +67,24 @@ itself. All four fixed in `UiKit.java`, `AvatarChatActivity.java`, `ModeSelectAc
    in its own `ScrollView`, that section still took `WRAP_CONTENT` (its full natural height)
    unconditionally, while the transcript panel below it was `weight=1` - meaning the transcript
    only ever got *whatever mainScroll didn't use*, which is zero once mainScroll's own content
-   alone exceeds the screen. Fixed by giving `mainScroll` a weight too (3, vs. the transcript's 1)
+   alone exceeds the screen. Fixed by giving `mainScroll` a weight too (originally 3 vs. the transcript's 1; now 5 vs. 1 - see #7)
    so both share the available space proportionally and both scroll internally within their own
    allotted share, instead of one unconditionally starving the other.
+7. **No "I'm done - end session" button visible in voice mode (`AvatarChatActivity`), and the orb
+   still clipped.** Reproduced on the emulator at the robot's reported 1280x800. Root cause of the
+   missing button: it was the last item inside the scrolling orb section, which is taller than the
+   space that section gets once it shares the screen with the transcript (fix #6) - so the button
+   was always below the fold, and a researcher had no visible way to end a voice-mode session. Fixed
+   by pinning it at the bottom of the screen, outside both scrolling regions (same placement as
+   `ChatActivity`), and moving the weights to 5:1 since the orb section no longer carries the
+   button. Orb clipping fixed with `main.setClipChildren(false)` on the layout that holds it.
+   Verified by A/B on the emulator, sampling the orb's width over 10 frames of the animation: the
+   old build never exceeded 292px (the layout box is 293px - clipped), the new one swells to ~302px
+   as designed. (An earlier "flat run at the edge" pixel metric used here was unreliable: even a
+   perfect circle has a ~30px chord on its extreme row.) On a very short 800x480 screen the end
+   button is still visible, but the mic dock needs a scroll inside the orb section.
 
-Re-tested at the same 800x480 resolution after the fix: a real question submitted from
+Re-tested at the same 800x480 resolution after the fix #6: a real question submitted from
 `AvatarChatActivity`'s typed-input mode round-trips correctly and the transcript panel's
 empty-state text ("Your conversation will appear here.") is now genuinely visible, confirming it
 has real allotted space. Didn't get a clean screenshot of an actual answer bubble rendered in that
