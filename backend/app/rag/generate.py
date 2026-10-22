@@ -37,8 +37,24 @@ def _qa_system_prompt(product_display_name: str, cfg: dict) -> str:
     return render_system_prompt(cfg["system_prompt"], product_display_name, cfg["fallback_text"])
 
 
+def _language_instruction(language: str, fallback_text: str) -> str:
+    # The fixed deflection stays in English first so in_scope logging (which matches it) still
+    # works; the translation follows on the next line for the participant.
+    return (
+        f"Reply in {language}. If the question is out of scope, reply with exactly this English "
+        f"sentence: \"{fallback_text}\" followed on a new line by the same sentence in {language}."
+    )
+
+
+def is_fallback(answer_text: str, fallback_text: str, language: str | None = None) -> bool:
+    """True when the answer is the fixed deflection (possibly followed by its translation)."""
+    answer_text = answer_text.strip()
+    return answer_text.startswith(fallback_text) if language else answer_text == fallback_text
+
+
 def _build_qa_messages(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None, cfg: dict
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None, cfg: dict,
+    language: str | None = None,
 ) -> list[dict]:
     excerpts = (
         "\n\n".join(f"[{c['section_label'] or 'Leaflet excerpt'}]\n{c['text']}" for c in chunks)
@@ -46,11 +62,17 @@ def _build_qa_messages(
         else "(no leaflet excerpts were retrieved for this query)"
     )
     user_content = f"Leaflet excerpts:\n\n{excerpts}\n\nParticipant's newest message: {query_text}"
+    if language:
+        # Repeated here as well as in the system message: the main prompt is English-centric, and an
+        # instruction next to the question is followed far more reliably.
+        user_content += f"\n\n(Write your reply in {language}.)"
 
     # Prior turns go in as real user/assistant messages (not flattened into one text block) so
     # the model resolves follow-ups ("what do you mean by that") the way it was actually trained
     # to use conversation context, rather than parsing a narrated transcript out of a single turn.
     messages: list[dict] = [{"role": "system", "content": _qa_system_prompt(product_display_name, cfg)}]
+    if language:
+        messages.append({"role": "system", "content": _language_instruction(language, cfg["fallback_text"])})
     for turn in history or []:
         messages.append({"role": "user", "content": turn["query"]})
         messages.append({"role": "assistant", "content": turn["answer"]})
@@ -59,10 +81,11 @@ def _build_qa_messages(
 
 
 def generate_answer(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None,
+    language: str | None = None,
 ) -> str:
     c = _c(cfg)
-    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c)
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c, language)
     resp = _client().chat.completions.create(
         model=c["generation_model"],
         max_tokens=c["max_tokens"],
@@ -74,14 +97,15 @@ def generate_answer(
 
 
 def generate_answer_stream(
-    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None
+    query_text: str, chunks: list[dict], product_display_name: str, history: list[dict] | None = None, cfg=None,
+    language: str | None = None,
 ):
     """Same call as generate_answer, but yields text deltas as the model produces them instead of
     blocking for the complete response - lets the caller start synthesizing/speaking the first
     sentence while the model is still writing the rest, instead of the full answer's generation
     time sitting entirely in front of the first word spoken."""
     c = _c(cfg)
-    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c)
+    messages = _build_qa_messages(query_text, chunks, product_display_name, history, c, language)
     stream = _client().chat.completions.create(
         model=c["generation_model"],
         max_tokens=c["max_tokens"],
@@ -104,7 +128,7 @@ Rules:
 4. No text outside the JSON object."""
 
 
-def generate_core_info(product_display_name: str, chunks: list[dict], cfg=None) -> dict:
+def generate_core_info(product_display_name: str, chunks: list[dict], cfg=None, language: str | None = None) -> dict:
     c = _c(cfg)
     if not chunks:
         return {
@@ -125,7 +149,8 @@ def generate_core_info(product_display_name: str, chunks: list[dict], cfg=None) 
         max_tokens=c["core_info_max_tokens"],
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": _CORE_INFO_SYSTEM_PROMPT},
+            {"role": "system", "content": _CORE_INFO_SYSTEM_PROMPT
+             + (f"\n5. Write every text value in {language}; keep the JSON keys in English." if language else "")},
             {"role": "user", "content": user_content},
         ],
     )

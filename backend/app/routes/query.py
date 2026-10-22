@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.db.models import Product, SessionRecord, Turn
 from app.db.session import SessionLocal, get_db
-from app.rag.generate import generate_answer, generate_answer_stream, generate_core_info
+from app.rag.generate import generate_answer, generate_answer_stream, generate_core_info, is_fallback
 from app.rag.retrieve import retrieve
 from app.rag.config_store import get_active_config
 from app.schemas import CoreInfoResponse, QueryRequest, QueryResponse, RetrievedChunk
@@ -72,9 +72,9 @@ def query(req: QueryRequest, db: DBSession = Depends(get_db)) -> QueryResponse:
     start = time.perf_counter()
     history = _recent_history(db, session.session_id, cfg["history_turns"])
     chunks = retrieve(db, req.query_text, product_id=session.product_id, cfg=cfg)
-    answer_text = generate_answer(req.query_text, chunks, product_display_name, history, cfg)
+    answer_text = generate_answer(req.query_text, chunks, product_display_name, history, cfg, req.response_language)
     # The logged in_scope flag reflects whether the fixed deflection text was actually shown.
-    in_scope = answer_text.strip() != cfg["fallback_text"]
+    in_scope = not is_fallback(answer_text, cfg["fallback_text"], req.response_language)
     latency_ms = (time.perf_counter() - start) * 1000
 
     turn_number = _next_turn_number(db, session.session_id)
@@ -123,18 +123,19 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
     session_id = session.session_id
     query_text = req.query_text
     input_method = req.input_method
+    language = req.response_language
     chunk_ids = [c["chunk_id"] for c in chunks]
     chunk_snapshot = _chunk_snapshot(chunks)
 
     def event_stream():
         start = time.perf_counter()
         parts: list[str] = []
-        for delta in generate_answer_stream(query_text, chunks, product_display_name, history, cfg):
+        for delta in generate_answer_stream(query_text, chunks, product_display_name, history, cfg, language):
             parts.append(delta)
             yield json.dumps({"delta": delta}) + "\n"
 
         answer_text = "".join(parts).strip() or cfg["fallback_text"]
-        in_scope = answer_text != cfg["fallback_text"]
+        in_scope = not is_fallback(answer_text, cfg["fallback_text"], language)
         latency_ms = (time.perf_counter() - start) * 1000
 
         write_db = SessionLocal()
@@ -165,13 +166,17 @@ def query_stream(req: QueryRequest, db: DBSession = Depends(get_db)) -> Streamin
             "in_scope": in_scope,
             "latency_ms": latency_ms,
             "answer_text": answer_text,
+            # Leaflet sections the answer was grounded in, best first (extra field - existing
+            # clients ignore it; the VR client shows it as the answer's source).
+            "sources": list(dict.fromkeys(c["section_label"] for c in chunk_snapshot if c["section_label"]))
+            if in_scope else [],
         }) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
 @router.post("/core-info", response_model=CoreInfoResponse)
-def core_info(session_id: str, db: DBSession = Depends(get_db)) -> CoreInfoResponse:
+def core_info(session_id: str, language: str | None = None, db: DBSession = Depends(get_db)) -> CoreInfoResponse:
     """Auto-triggered structured info delivery for screen 3. Logged as a turn with
     input_method='system' since it isn't participant-initiated."""
     session = _get_session_or_404(db, session_id)
@@ -183,7 +188,7 @@ def core_info(session_id: str, db: DBSession = Depends(get_db)) -> CoreInfoRespo
     query_text = f"What is {product.display_name} used for, the dose, frequency, max dose, and warnings?"
     cfg = get_active_config(db)
     chunks = retrieve(db, query_text, product_id=session.product_id, top_k=cfg["core_info_top_k"], cfg=cfg)
-    data = generate_core_info(product.display_name, chunks, cfg)
+    data = generate_core_info(product.display_name, chunks, cfg, language)
     latency_ms = (time.perf_counter() - start) * 1000
     data["latency_ms"] = latency_ms
 

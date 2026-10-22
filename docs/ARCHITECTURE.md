@@ -30,6 +30,7 @@ backend/            FastAPI + SQLAlchemy + FAISS — the shared brain for both c
 frontend-app/        React/Vite — tablet/web participant app ("MedCheck"), Condition B
 frontend-admin/       React — researcher/admin panel (corpus + session data), HTTP Basic Auth
 frontend-pepper/      Native Android (QiSDK) — Pepper robot app, Condition A
+frontend-vr/          Unity 6 + Meta XR SDK — virtual Pepper in a VR pharmacy on Meta Quest (see frontend-vr/CLAUDE.md)
 docs/                 This file, PEPPER_PARITY_CHANGES.md, QA_TESTING_GUIDE.md (untracked)
 ```
 
@@ -99,6 +100,21 @@ natively through QiSDK, which never called the backend's TTS proxy in the first 
   cache hit rate on repeat calls in testing) — no code change needed, it kicks in automatically
   for prompts over ~1024 tokens with a stable prefix (the system prompt + leaflet chunks).
 
+### VR condition additions (all optional, existing clients unaffected)
+
+Added for `frontend-vr`; the tablet and Pepper clients don't send the new fields, so their requests,
+prompts and logging are unchanged:
+
+- `platform = "vr_quest"` → `condition = "vr_pepper"` (`routes/sessions.py`), so VR sessions never mix
+  with tablet data.
+- `QueryRequest.response_language` and `POST /api/core-info?language=` — reply in another language.
+  Out-of-scope replies start with the exact English `fallback_text` followed by a translation, and
+  `generate.is_fallback()` still logs them as `in_scope = false`.
+- `/api/query/stream`'s final `done` line includes `sources` — the leaflet section labels the answer
+  was grounded in (empty when out of scope).
+- `TTSRequest.slow` — slower, clearer delivery (passed to OpenAI via `extra_body` because the pinned
+  openai SDK predates the `instructions` argument).
+
 ## Data model (`backend/app/db/models.py`)
 
 SQLite via SQLAlchemy, **no Alembic / formal migrations** — schema is created with
@@ -115,8 +131,8 @@ doc should be updated at that point.
   Product for fast filtering. `vector_index` matches its row position in the FAISS index, which
   is always rebuilt fully from Chunk rows on ingest.
 - **SessionRecord** — one participant session: `platform` (`tablet_web` / `mobile_web` /
-  `desktop_web` / `android_native` / `pepper`), `condition` (`tablet_ai` or `pepper` — derived
-  from `platform`, see below), the Product being discussed, device info, start/end time, turn
+  `desktop_web` / `android_native` / `pepper` / `vr_quest`), `condition` (`tablet_ai`, `pepper` or
+  `vr_pepper` — derived from `platform`, see below), the Product being discussed, device info, start/end time, turn
   count.
 - **Turn** — one Q&A exchange within a session: query text, retrieved chunk IDs, response text,
   `in_scope` flag, latency, timestamp, `input_method` (`voice`/`typed`).
@@ -127,8 +143,8 @@ value comes back naive. Without this, every timestamp shown in the admin panel w
 viewer's local UTC offset, because a naive ISO string (no `Z`/offset suffix) gets parsed by
 browsers as local time, not UTC. Postgres (which does preserve tzinfo) passes through unaffected.
 
-**`condition` derivation** (`routes/sessions.py`): `"pepper" if platform == "pepper" else
-"tablet_ai"`. This used to be hardcoded to `"tablet_ai"` for every platform — a real
+**`condition` derivation** (`routes/sessions.py`): `pepper` → `"pepper"`, `vr_quest` →
+`"vr_pepper"`, anything else → `"tablet_ai"`. This used to be hardcoded to `"tablet_ai"` for every platform — a real
 data-integrity bug for the study, since it meant Pepper sessions were indistinguishable from
 tablet sessions in the data. Fixed and verified against production.
 

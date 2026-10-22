@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Platform = Literal["tablet_web", "mobile_web", "desktop_web", "android_native", "pepper"]
+Platform = Literal["tablet_web", "mobile_web", "desktop_web", "android_native", "pepper", "vr_quest"]
 InputMethod = Literal["voice", "typed", "system"]  # "system" = auto-triggered core-info delivery, not participant input
 
 
@@ -44,6 +44,9 @@ class QueryRequest(BaseModel):
     session_id: str
     query_text: str
     input_method: InputMethod
+    # Optional reply language (e.g. "Arabic"). Omitted by the tablet/Pepper clients, so their
+    # behaviour is unchanged; the VR client sends it when the participant picks another language.
+    response_language: str | None = None
 
 
 class RetrievedChunk(BaseModel):
@@ -77,6 +80,7 @@ class CoreInfoResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
+    slow: bool = False  # accessibility: slower, clearer delivery (VR client setting)
 
 
 class STTResponse(BaseModel):

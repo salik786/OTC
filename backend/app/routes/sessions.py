@@ -37,11 +37,12 @@ def start_session(req: SessionStartRequest, db: DBSession = Depends(get_db)) -> 
     if product is None:
         raise HTTPException(status_code=404, detail=f"unknown product_slug '{req.product_slug}'")
 
-    # Study condition follows directly from platform: Pepper is the embodied condition, every
-    # other platform value is the tablet/non-embodied condition. This was previously hardcoded to
-    # "tablet_ai" for every session including Pepper's, which would have silently mislabeled every
-    # robot-condition session as the tablet condition in any analysis grouped by `condition`.
-    condition = "pepper" if req.platform == "pepper" else "tablet_ai"
+    # Study condition follows directly from platform: Pepper is the embodied condition, VR the
+    # virtual-embodied condition, every other platform value the tablet/non-embodied condition.
+    # This was previously hardcoded to "tablet_ai" for every session including Pepper's, which
+    # would have silently mislabeled every robot-condition session as the tablet condition in any
+    # analysis grouped by `condition`.
+    condition = {"pepper": "pepper", "vr_quest": "vr_pepper"}.get(req.platform, "tablet_ai")
 
     participant_id = req.participant_id or f"P-{uuid.uuid4().hex[:8]}"
     session = SessionRecord(
