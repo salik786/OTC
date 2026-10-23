@@ -78,9 +78,15 @@ class CoreInfoResponse(BaseModel):
     latency_ms: float
 
 
+TTSVoice = Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
+
+
 class TTSRequest(BaseModel):
     text: str
     slow: bool = False  # accessibility: slower, clearer delivery (VR client setting)
+    # Optional per-request voice (the VR client gives each assistant avatar its own voice);
+    # omitted by the other clients, which keep the configured default.
+    voice: TTSVoice | None = None
 
 
 class STTResponse(BaseModel):

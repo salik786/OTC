@@ -48,7 +48,7 @@ def text_to_speech(req: TTSRequest) -> StreamingResponse:
                      if settings.openai_tts_model.startswith("gpt-4o") else {"speed": 0.85})
         with _openai().audio.speech.with_streaming_response.create(
             model=settings.openai_tts_model,
-            voice=settings.openai_tts_voice,
+            voice=req.voice or settings.openai_tts_voice,
             input=req.text,
             **extra,
         ) as response:

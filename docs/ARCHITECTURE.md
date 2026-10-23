@@ -112,6 +112,8 @@ prompts and logging are unchanged:
   `generate.is_fallback()` still logs them as `in_scope = false`.
 - `/api/query/stream`'s final `done` line includes `sources` — the leaflet section labels the answer
   was grounded in (empty when out of scope).
+- `TTSRequest.voice` — optional OpenAI voice per request (validated against the allowed list); the VR
+  client gives each assistant avatar its own voice. Omitted → the configured `OPENAI_TTS_VOICE`.
 - `TTSRequest.slow` — slower, clearer delivery (passed to OpenAI via `extra_body` because the pinned
   openai SDK predates the `instructions` argument).
 
