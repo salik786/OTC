@@ -40,12 +40,21 @@ def text_to_speech(req: TTSRequest) -> StreamingResponse:
     strictly after it."""
     def relay():
         extra = {}
+        instructions = []
+        if req.voice:
+            # Assistant voices (VR client): a warm, calm pharmacist delivery. Clients that don't pick a
+            # voice (tablet, Pepper) keep the default delivery unchanged.
+            instructions.append("Speak in a warm, calm, friendly and reassuring tone, like a caring "
+                                "pharmacist talking to a customer. Natural pace, gentle and professional.")
         if req.slow:
-            # gpt-4o-mini-tts ignores `speed` but follows delivery instructions; older tts-1 models
-            # take `speed` instead.
-            # (sent via extra_body so it also works with openai SDKs older than the `instructions` kwarg)
-            extra = ({"extra_body": {"instructions": "Speak slowly and clearly, with short pauses between sentences."}}
-                     if settings.openai_tts_model.startswith("gpt-4o") else {"speed": 0.85})
+            instructions.append("Speak slowly and clearly, with short pauses between sentences.")
+        if instructions:
+            # gpt-4o-mini-tts ignores `speed` but follows delivery instructions (sent via extra_body so it
+            # also works with openai SDKs older than the `instructions` kwarg); tts-1 models take `speed`.
+            if settings.openai_tts_model.startswith("gpt-4o"):
+                extra = {"extra_body": {"instructions": " ".join(instructions)}}
+            elif req.slow:
+                extra = {"speed": 0.85}
         with _openai().audio.speech.with_streaming_response.create(
             model=settings.openai_tts_model,
             voice=req.voice or settings.openai_tts_voice,
